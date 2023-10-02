@@ -1,0 +1,32 @@
+---
+title: "CA_Emb_Clus"
+output: html_document
+date: "`r Sys.Date()`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#Install and load necessary packages
+packages <- c("here","tidyverse","dplyr","readxl")
+install.packages(packages)
+lapply(packages,library, character.only=T)
+```
+
+Reading in the data
+
+```{r}
+#Read in the datasets "Embeddings_text", "features", & wordEmbeddings and merge them
+sentences <- read.csv(here("data","Embeddings_text.csv"))
+structure <- read_excel(here("data","wordEmbeddings.xlsx"))
+embeddings <- read.csv(here("data","features.csv"))
+
+structure <- structure %>%
+  mutate (sentence = sentences$word.comment)%>%
+  select(-`word+comment`)
+
+climateact <- cbind(structure,embeddings)
+```
+
