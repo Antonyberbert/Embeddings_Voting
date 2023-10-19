@@ -10,8 +10,12 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 #Install and load necessary packages
-packages <- c("here","tidyverse","dplyr","readxl")
-install.packages(packages)
+packages <- c("here","tidyverse","dplyr","readxl","RColorBrewer")
+for (package in packages) {
+  if (!requireNamespace(package, quietly = TRUE)) {
+    install.packages(package)
+  }
+}
 lapply(packages,library, character.only=T)
 ```
 
@@ -28,5 +32,276 @@ structure <- structure %>%
   select(-`word+comment`)
 
 climateact <- cbind(structure,embeddings)
+```
+
+```{r}
+#Install and load umap, dbscan, & fpc for dimensionality reduction & clustering
+dim.packages <- c("umap","dbscan","fpc")
+for (package in dim.packages) {
+  if (!requireNamespace(package, quietly = TRUE)) {
+    install.packages(package)
+  }
+}
+lapply(dim.packages,library, character.only=T)
+```
+
+```{r}
+#Dimensionality Reduction 2 Dimensions
+#Change Arguments of umap
+custom.settings <- umap.defaults
+custom.settings$random_state = 26 #set seed for reproducibility
+custom.settings$transform_state = 26 #set seed for reproducibility
+
+#Perform dimensionality reduction on embeddings with umap
+umap_result_2 <- umap::umap(climateact[,-c(1:11)],custom.settings) #exclude non-embedding columns
+
+#Visualize the results
+plot(umap_result_2$layout[,1],umap_result_2$layout[,2], main = "UMAP Reduction", xlab="UMAP 1", ylab = "UMAP 2")
+
+#Check trustworthiness and continuity score to evaluate fit
+#Between 0-1, the higher the better, >= 0.8 is seen as good
+#------No package to check trustworthiness and continuity!!
+
+```
+
+```{r, eval=F}
+#Dimensionality Reduction 30 Dimensions and 20 neighbors
+#Change Arguments of umap
+custom.settings30 <- umap.defaults
+custom.settings30$random_state = 26 #set seed for reproducibility
+custom.settings30$transform_state = 26 #set seed for reproducibility
+custom.settings30$n_components = 30 #30 dimensions
+custom.settings30$n_neighbors = 20
+
+#Perform dimensionality reduction on embeddings with umap
+umap_result_30 <- umap(climateact[,-c(1:11)],custom.settings30) #exclude non-embedding columns
+
+#Visualize the results
+plot(umap_result_30$layout[,1],umap_result_30$layout[,2], main = "UMAP Reduction", xlab="UMAP 1", ylab = "UMAP 2")
+
+#Check trustworthiness and continuity score to evaluate fit
+#Between 0-1, the higher the better, >= 0.8 is seen as good
+#------No package to check trustworthiness and continuity!!
+
+```
+```{r, eval=F}
+#Dimensionality Reduction 10 Dimensions with 25 neighbors
+#Change Arguments of umap
+custom.settings10 <- umap.defaults
+custom.settings10$random_state = 26 #set seed for reproducibility
+custom.settings10$transform_state = 26 #set seed for reproducibility
+custom.settings10$n_components = 10 #10 dimensions
+custom.settings10$n_neighbors = 25
+
+#Perform dimensionality reduction on embeddings with umap
+umap_result_10 <- umap(climateact[,-c(1:11)],custom.settings10) #exclude non-embedding columns
+
+#Visualize the results
+plot(umap_result_10$layout[,1],umap_result_10$layout[,2], main = "UMAP Reduction", xlab="UMAP 1", ylab = "UMAP 2")
+
+#Check trustworthiness and continuity score to evaluate fit
+#Between 0-1, the higher the better, >= 0.8 is seen as good
+#------No package to check trustworthiness and continuity!!
+
+```
+```{r,eval=F}
+#Dimensionality Reduction 2 Dimensions with 30 neighbors
+#Change Arguments of umap
+custom.settingsb <- umap.defaults
+custom.settingsb$random_state = 26 #set seed for reproducibility
+custom.settingsb$transform_state = 26 #set seed for reproducibility
+custom.settingsb$n_neighbors = 30
+
+#Perform dimensionality reduction on embeddings with umap
+umap_result_2b <- umap::umap(climateact[,-c(1:11)],custom.settingsb) #exclude non-embedding columns
+
+#Visualize the results
+plot(umap_result_2b$layout[,1],umap_result_2b$layout[,2], main = "UMAP Reduction", xlab="UMAP 1", ylab = "UMAP 2")
+
+#Check trustworthiness and continuity score to evaluate fit
+#Between 0-1, the higher the better, >= 0.8 is seen as good
+#------No package to check trustworthiness and continuity!!
+
+```
+```{r}
+#Perform clustering with DBSCAN (Density-Based Spatial Clustering)
+#dbscan is useful when clusters may have irregular shapes and varying densities and is robust against noise and outliers.
+
+#Find suitable DBSCAN parameters by inspecting kNN plot
+#Use minPts = 3 because n dimensions + 1
+kNNdistplot(umap_result_2$layout, minPts = 3) #turning point at around 0.1
+# Add a vertical line at x = 6400
+abline(v = 6450)
+abline(h = 0.156, col = "red")
+text(6000,0.2,"eps = 0.15", cex= 0.5)
+# Label the y-value at the turning point
+```
+
+```{r,eval=F}
+#set seed and cluster with eps = .15 and minPts = 3
+set.seed(26)
+dbscan_result <- dbscan(umap_result_2$layout, eps = 0.15, MinPts = 3)
+
+# Add the DBSCAN cluster assignments to your dataframe
+climateact$DBSCAN_cluster <- dbscan_result$cluster
+
+# Check the noise points (those with cluster ID 0)
+noise_points <- sum(dbscan_result$cluster == 0)
+
+# Print the number of clusters and noise points
+cat("Number of clusters:", max(dbscan_result$cluster), "\n")
+cat("Number of noise points:", noise_points, "\n")
+
+#Plot the clusters
+eps015_mpts3 <- plot(dbscan_result,umap_result_2$layout, main = "Cluster eps 0.15, MinPts 3", xlab = "Dim1", ylab = "Dim2")
+text(13, 14, labels = "Clusters = 136 \n Noise points = 154", pos = 3, cex = 0.5)
+
+#136 clusters are too many. Reducing clusters by adjusting eps and minPts
+```
+```{r, eval=F}
+#When looking at the cluster graph, there seem to be a lot of small clusters. We are first going to increase eps
+set.seed(26)
+dbscan_resultb <- dbscan(umap_result_2$layout, eps = 0.3, MinPts = 3)
+
+# Add the DBSCAN cluster assignments to your dataframe
+climateact$DBSCAN_clusterb <- dbscan_resultb$cluster
+
+# Check the noise points (those with cluster ID 0)
+noise_pointsb <- sum(dbscan_resultb$cluster == 0)
+
+# Print the number of clusters and noise points
+cat("Number of clusters:", max(dbscan_resultb$cluster), "\n")
+cat("Number of noise points:", noise_pointsb, "\n")
+
+#Plot the clusters
+eps03_mpts3 <- plot(dbscan_resultb,umap_result_2$layout,main = "Cluster eps 0.3, MinPts 3", xlab = "Dim1", ylab = "Dim2")
+text(13, 14, labels = "Clusters = 55 \n Noise points = 12", pos = 3, cex = 0.5)
+```
+```{r, eval=F}
+#Now we want to increase the MinPts to further reduce the number of clusters. MinPts represent the minimum number of data points to form a cluster
+set.seed(26)
+dbscan_resultc <- dbscan(umap_result_2$layout, eps = 0.3, MinPts = 30)
+
+# Add the DBSCAN cluster assignments to your dataframe
+climateact$DBSCAN_clusterc <- dbscan_resultc$cluster
+
+# Check the noise points (those with cluster ID 0)
+noise_pointsc <- sum(dbscan_resultc$cluster == 0)
+
+# Print the number of clusters and noise points
+cat("Number of clusters:", max(dbscan_resultc$cluster), "\n")
+cat("Number of noise points:", noise_pointsc, "\n")
+
+#Plot the clusters
+eps03_mpts30 <- plot(dbscan_resultc,umap_result_2$layout,main = "Cluster eps 0.3, MinPts 30", xlab = "Dim1", ylab = "Dim2")
+text(13, 14, labels = "Clusters = 56 \n Noise points = 1116", pos = 3, cex = 0.5)
+```
+```{r}
+#We will now increase the eps since before there were a lot of noise points.
+set.seed(26)
+dbscan_resultd <- dbscan(umap_result_2$layout, eps = 0.5, MinPts = 30)
+
+# Check the noise points (those with cluster ID 0)
+noise_pointsd <- sum(dbscan_resultd$cluster == 0)
+noised <- dbscan_resultd$cluster == 0
+
+# Print the number of clusters and noise points
+cat("Number of clusters:", max(dbscan_resultd$cluster), "\n")
+cat("Number of noise points:", noise_pointsd, "\n")
+
+#Remove the noise points from cluster results
+dbscan_resultd$cluster_clean <- dbscan_resultd$cluster[!noised]
+
+#remove noise points from umap
+umap_result_2_clean <- umap_result_2
+umap_result_2_clean$layout <- umap_result_2$layout[!noised,1:2]
+
+
+# Add the DBSCAN cluster assignments to climateact df
+climateact$DBSCAN_clusterd <- dbscan_resultd$cluster
+
+#Plot the clusters
+#Color Palette with 25 colors
+col25 <- c(
+  "dodgerblue2", "#E31A1C", # red
+  "green4",
+  "#6A3D9A", # purple
+  "#FF7F00", # orange
+  "black", "gold1",
+  "skyblue2", "#FB9A99", # lt pink
+  "palegreen2",
+  "#CAB2D6", # lt purple
+  "#FDBF6F", # lt orange
+  "gray70", "khaki2",
+  "maroon", "orchid1", "deeppink1", "blue1", "steelblue4",
+  "darkturquoise", "green1", "yellow4", "yellow3",
+  "darkorange4", "brown"
+)
+eps05_mpts30 <- plot(umap_result_2_clean$layout[,1],umap_result_2_clean$layout[,2],col=col25[sort(dbscan_resultd$cluster_clean)],main = "Cluster eps 0.5, MinPts 30", xlab = "Dim1", ylab = "Dim2")
+text(13, 14, labels = "Clusters = 24 \n Noise points = 294", pos = 3, cex = 0.5)
+
+#24 clusters and 294 noise points seem very good. We will now evaluate the fit of the clusters.
+```
+
+```{r}
+# Load the required library
+if (!requireNamespace("cluster", quietly = TRUE)) {
+  # If not installed, install the package
+  install.packages("cluster")
+}
+library(cluster)
+
+# Calculate silhouette score
+sil.dbscan <- silhouette(dbscan_resultd$cluster_clean, dist((umap_result_2_clean$layout)))
+summary(sil.dbscan)
+
+#Plot Silhouette
+col25 <- c(
+  "dodgerblue2", "#E31A1C", # red
+  "green4",
+  "#6A3D9A", # purple
+  "#FF7F00", # orange
+  "black", "gold1",
+  "skyblue2", "#FB9A99", # lt pink
+  "palegreen2",
+  "#CAB2D6", # lt purple
+  "#FDBF6F", # lt orange
+  "gray70", "khaki2",
+  "maroon", "orchid1", "deeppink1", "blue1", "steelblue4",
+  "darkturquoise", "green1", "yellow4", "yellow3",
+  "darkorange4", "brown"
+)
+plot(sil.dbscan, col=col25[sort(dbscan_resultd$cluster_clean)])
+#Doesn't work
+```
+
+
+```{r,eval=F}
+#Perform Clustering with fpc (Fuzzy Clustering and Partitioning)
+#Benefits of fpc: data points may belong to multiple clusters with varying degrees of membership
+# Set the maximum number of clusters to consider
+k_max <- 20
+
+# Initialize variables to store cluster validity measures
+cluster_silwidths <- numeric(k_max)
+
+# Iterate through different numbers of clusters
+# Calculate silhouette scores for different numbers of clusters
+for (k in 2:k_max) {  # Start from 2, as 1 cluster doesn't provide meaningful information
+  kmeans_result <- kmeans(umap_result$layout, centers = k, nstart = 25)
+  sil_scores <- silhouette(kmeans_result$cluster, dist(umap_result$layout))
+  cluster_silwidths[k] <- mean(sil_scores[, "sil_width"])
+}
+
+
+# Find the optimal number of clusters based on silhouette width
+optimal_k <- which.max(cluster_silwidths)
+
+# Perform clustering with the optimal number of clusters
+optimal_kmeans <- kmeans(umap_result$layout, centers = optimal_k, nstart = 25)
+
+# Add a new column 'cluster' to 'climateact' with cluster assignments
+climateact$cluster <- optimal_kmeans$cluster
+
 ```
 
