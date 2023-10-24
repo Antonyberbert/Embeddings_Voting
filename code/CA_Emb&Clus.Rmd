@@ -10,7 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 #Install and load necessary packages
-packages <- c("here","tidyverse","dplyr","readxl","RColorBrewer")
+packages <- c("here","tidyverse","dplyr","readxl","umap","dbscan","fpc")
 for (package in packages) {
   if (!requireNamespace(package, quietly = TRUE)) {
     install.packages(package)
@@ -26,26 +26,251 @@ Reading in the data
 sentences <- read.csv(here("data","Embeddings_text.csv"))
 structure <- read_excel(here("data","wordEmbeddings.xlsx"))
 embeddings <- read.csv(here("data","features.csv"))
+embeddings2 <- read.csv(here("data","features2.csv"))
 
+# Modify the structure dataframe
 structure <- structure %>%
-  mutate (sentence = sentences$word.comment)%>%
+  mutate(sentence = sentences$word.comment) %>%
   select(-`word+comment`)
 
-climateact <- cbind(structure,embeddings)
-```
+# Combine structure and embeddings dataframes
+climateact <- cbind(structure, select(embeddings2,-1))
 
+# Import the new CSV file
+additional_data <- read.csv(here("data","all_surveys.csv"))
+
+# Left join on the 'personID' column of climateact with the 'participantID' column of additional_data
+climateact <- left_join(climateact, 
+                        select(additional_data, participantID, intendedVote, ratingLaw, mean_valence_macro), 
+                        by = c("personID" = "participantID"))
+
+# Rearrange the columns to place the new columns at positions 11-13
+cols <- c(1:10, (ncol(climateact)-2):ncol(climateact), 11:(ncol(climateact)-3))
+climateact <- climateact[, cols]
+
+# Check the first few rows of the merged data to ensure correctness
+head(climateact)
+```
 ```{r}
-#Install and load umap, dbscan, & fpc for dimensionality reduction & clustering
-dim.packages <- c("umap","dbscan","fpc")
-for (package in dim.packages) {
-  if (!requireNamespace(package, quietly = TRUE)) {
-    install.packages(package)
-  }
+# Load the necessary libraries
+library(dplyr)
+library(glmnet)
+
+# 1) Regression with mean_valence_macro as the independent variable 
+# and intendedVote as the dependent variable using basic logistic regression.
+model1 <- glm(intendedVote ~ mean_valence_macro, 
+             data = climateact, 
+             family = binomial(link = "logit"))
+
+summary(model1)
+
+# Continue with the regularized regressions for model2 and model3...
+
+# Extract embeddings for model2 and model3
+embedding_cols <- paste("X", 0:383, sep = "")
+X2 <- as.matrix(climateact[, embedding_cols])
+
+# 2) Regression with the embeddings as independent variables and 
+# intendedVote as the dependent variable using Elastic Net.
+model2 <- glmnet(X2, Y, family = "binomial", alpha = 0.5)
+cv.model2 <- cv.glmnet(X2, Y, family = "binomial", alpha = 0.5)
+print(cv.model2)
+
+# 3) Regression with the embeddings as independent variables and mean_valence_macro,
+# with intendedVote as the dependent variable using Elastic Net.
+X3 <- as.matrix(climateact[, c("mean_valence_macro",embedding_cols)])
+model3 <- glmnet(X3, Y, family = "binomial", alpha = 0.5)
+cv.model3 <- cv.glmnet(X3, Y, family = "binomial", alpha = 0.5)
+print(cv.model3)
+
+#4 Rsquared
+log_likelihood <- function(actual, predicted) {
+  sum(actual * log(predicted) + (1 - actual) * log(1 - predicted))
 }
-lapply(dim.packages,library, character.only=T)
+# Null model
+null_prob <- predict(null_model2, type = "response")
+logLik_null2 <- log_likelihood(Y, null_prob)
+
+# Model2
+predicted_prob2 <- predict(model2, newx = X2, type = "response", s = cv.model2$lambda.min)
+logLik_model2 <- log_likelihood(Y, predicted_prob2)
+
+# Model3
+predicted_prob3 <- predict(model3, newx = X3, type = "response", s = cv.model3$lambda.min)
+logLik_model3 <- log_likelihood(Y, predicted_prob3)
+
+R2_model2 <- 1 - (logLik_model2 / logLik_null2)
+R2_model3 <- 1 - (logLik_model3 / logLik_null3)
+
+# Incremental R^2:
+incremental_R2 <- R2_model3 - R2_model2
+
+print(paste("R^2 for Model 2:", R2_model2))
+print(paste("R^2 for Model 3:", R2_model3))
+print(paste("Incremental R^2:", incremental_R2))
+```
+
+
+```{r}
+#Principal Component Analysis to reduce to important dimensions
+# Loading required library
+library(stats)
+set.seed(123)
+# Scaling the embeddings
+scaled_embeddings <- scale(embeddings)
+
+# Applying PCA
+pca_result <- prcomp(scaled_embeddings, center = TRUE, scale. = TRUE)
+
+# Plotting the variance explained by each principal component
+explained_variance_ratio <- pca_result$sdev^2 / sum(pca_result$sdev^2)
+cum_explained_variance <- cumsum(explained_variance_ratio)
+plot(explained_variance_ratio, type = "b", main="Explained Variance by Principal Components",
+     xlab = "Principal Component", ylab = "Explained Variance Ratio")
+
+plot(cum_explained_variance, type = "b", main="Cumulative Explained Variance",
+     xlab = "Number of Principal Components", ylab = "Cumulative Explained Variance Ratio",
+     ylim=c(0.8,1), yaxp=c(0.8,1,4))  # Here, it's divided into 0.8, 0.85, 0.9, 0.95, 1
+
+#By inspecting the Cumulative graph, choose what number of components explain 95% of variance
+
+```
+```{r}
+# Loading required library
+library(Rtsne)
+
+# Applying t-SNE
+set.seed(123)
+tsne_result <- Rtsne(scaled_embeddings, dims = 2, perplexity = 30, check_duplicates = FALSE)
+
+# Plotting the t-SNE result
+plot(tsne_result$Y, col = "blue", pch = 20, main="t-SNE Visualization")
+
+```
+```{r}
+# Project the data onto the first 250 principal components
+pca_transformed_data <- pca_result$x[, 1:250]
 ```
 
 ```{r}
+# Define a function to plot kNN distance for a given k
+plot_knn_dist <- function(data, k) {
+  knn_dist <- dbscan::kNNdist(data, k = k)
+  sorted_knn_dist <- sort(knn_dist, decreasing = TRUE)
+  
+  ggplot() + 
+    geom_line(aes(x = 1:length(sorted_knn_dist), y = sorted_knn_dist)) +
+    labs(title = paste0(k, "-NN Distance Plot"), x = "Points", y = "Distance") +
+    theme_minimal()
+}
+
+# Plot for k = 4
+plot_knn_dist(pca_transformed_data, 4)
+
+# Plot for k = 50
+plot_knn_dist(pca_transformed_data, 50)
+
+# Plot for k = 250
+plot_knn_dist(pca_transformed_data, 250)
+```
+```{r}
+# Apply DBSCAN
+db_result <- dbscan::dbscan(pca_transformed_data, eps = 18, minPts = 5)
+
+# Count of data points in each cluster
+cluster_counts <- table(db_result$cluster)
+
+# Display the clustering results
+print(cluster_counts)
+
+# Number of clusters (excluding noise)
+num_clusters <- length(unique(db_result$cluster)) - 1  # Subtracting 1 to exclude noise
+cat("Number of clusters:", num_clusters, "\n")
+
+# Number of noise points
+num_noise <- sum(db_result$cluster == 0)
+cat("Number of noise points:", num_noise, "\n")
+```
+```{r}
+# Create a dataframe for visualization
+viz_data <- data.frame(PC1 = pca_transformed_data[,1], 
+                       PC2 = pca_transformed_data[,2], 
+                       Cluster = as.factor(db_result$cluster))
+
+# Plot using ggplot2
+ggplot(viz_data, aes(x = PC1, y = PC2, color = Cluster)) + 
+  geom_point(alpha = 0.6) + 
+  labs(title = "DBSCAN Clustering Visualization", x = "Principal Component 1", y = "Principal Component 2") +
+  theme_minimal() +
+  scale_color_discrete(name = "Cluster") +
+  theme(legend.position = "bottom")
+
+```
+```{r}
+# 1. Compute the distance matrix
+dist_matrix <- dist(pca_transformed_data, method = "euclidean")
+
+# 2. Apply hierarchical clustering
+hclust_result <- hclust(dist_matrix, method = "average")  # "average" linkage method
+
+# 3. Plot the dendrogram
+plot(hclust_result, hang = -1, cex = 0.6, main = "Dendrogram of Hierarchical Clustering")
+```
+```{r}
+library(cluster)
+# A range for potential cluster numbers
+cluster_range <- 2:10  # Adjust this range as needed
+
+# Store silhouette scores for each number of clusters
+sil_scores <- numeric(length(cluster_range))
+
+for (i in cluster_range) {
+  # Cut the dendrogram to obtain 'i' clusters
+  cluster_assignments <- cutree(hclust_result, k = i)
+  
+  # Compute silhouette score for the clustering solution
+  sil <- silhouette(cluster_assignments, dist_matrix)
+  sil_scores[i - 1] <- mean(sil[, 3])
+}
+
+# Find the number of clusters that has the maximum silhouette score
+optimal_clusters <- cluster_range[which.max(sil_scores)]
+
+# Plot silhouette scores
+plot(cluster_range, sil_scores, type="b", xlab="Number of Clusters", ylab="Silhouette Score",
+     main="Silhouette Score for Different Number of Clusters")
+
+cat("Optimal number of clusters:", optimal_clusters)
+
+```
+
+```{r}
+# Cut the dendrogram to obtain 2 clusters
+cluster_assignments <- cutree(hclust_result, k = 2)
+
+# Visualize the clusters using the first two principal components
+library(ggplot2)
+
+plot_data <- data.frame(PC1 = pca_transformed_data[, 1],
+                        PC2 = pca_transformed_data[, 2],
+                        Cluster = factor(cluster_assignments))
+
+ggplot(plot_data, aes(x = PC1, y = PC2, color = Cluster)) +
+  geom_point(alpha = 0.6) +
+  labs(title = "Hierarchical Clustering with 2 Clusters", x = "Principal Component 1", y = "Principal Component 2") +
+  theme_minimal() +
+  scale_color_discrete(name = "Cluster")
+
+```
+
+
+
+
+
+
+
+
+```{r,eval=F}
 #Dimensionality Reduction 2 Dimensions
 #Change Arguments of umap
 custom.settings <- umap.defaults
@@ -84,6 +309,7 @@ plot(umap_result_30$layout[,1],umap_result_30$layout[,2], main = "UMAP Reduction
 #------No package to check trustworthiness and continuity!!
 
 ```
+
 ```{r, eval=F}
 #Dimensionality Reduction 10 Dimensions with 25 neighbors
 #Change Arguments of umap
@@ -104,6 +330,7 @@ plot(umap_result_10$layout[,1],umap_result_10$layout[,2], main = "UMAP Reduction
 #------No package to check trustworthiness and continuity!!
 
 ```
+
 ```{r,eval=F}
 #Dimensionality Reduction 2 Dimensions with 30 neighbors
 #Change Arguments of umap
@@ -123,7 +350,8 @@ plot(umap_result_2b$layout[,1],umap_result_2b$layout[,2], main = "UMAP Reduction
 #------No package to check trustworthiness and continuity!!
 
 ```
-```{r}
+
+```{r,eval=F}
 #Perform clustering with DBSCAN (Density-Based Spatial Clustering)
 #dbscan is useful when clusters may have irregular shapes and varying densities and is robust against noise and outliers.
 
@@ -158,6 +386,7 @@ text(13, 14, labels = "Clusters = 136 \n Noise points = 154", pos = 3, cex = 0.5
 
 #136 clusters are too many. Reducing clusters by adjusting eps and minPts
 ```
+
 ```{r, eval=F}
 #When looking at the cluster graph, there seem to be a lot of small clusters. We are first going to increase eps
 set.seed(26)
@@ -177,6 +406,7 @@ cat("Number of noise points:", noise_pointsb, "\n")
 eps03_mpts3 <- plot(dbscan_resultb,umap_result_2$layout,main = "Cluster eps 0.3, MinPts 3", xlab = "Dim1", ylab = "Dim2")
 text(13, 14, labels = "Clusters = 55 \n Noise points = 12", pos = 3, cex = 0.5)
 ```
+
 ```{r, eval=F}
 #Now we want to increase the MinPts to further reduce the number of clusters. MinPts represent the minimum number of data points to form a cluster
 set.seed(26)
@@ -196,7 +426,8 @@ cat("Number of noise points:", noise_pointsc, "\n")
 eps03_mpts30 <- plot(dbscan_resultc,umap_result_2$layout,main = "Cluster eps 0.3, MinPts 30", xlab = "Dim1", ylab = "Dim2")
 text(13, 14, labels = "Clusters = 56 \n Noise points = 1116", pos = 3, cex = 0.5)
 ```
-```{r}
+
+```{r,eval=F}
 #We will now increase the eps since before there were a lot of noise points.
 set.seed(26)
 dbscan_resultd <- dbscan(umap_result_2$layout, eps = 0.5, MinPts = 30)
@@ -243,7 +474,7 @@ text(13, 14, labels = "Clusters = 24 \n Noise points = 294", pos = 3, cex = 0.5)
 #24 clusters and 294 noise points seem very good. We will now evaluate the fit of the clusters.
 ```
 
-```{r}
+```{r,eval=F}
 # Load the required library
 if (!requireNamespace("cluster", quietly = TRUE)) {
   # If not installed, install the package
