@@ -1,0 +1,628 @@
+---
+title: "CA_Emb_Clus"
+output: html_document
+date: "`r Sys.Date()`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#Install and load necessary packages
+packages <- c("here","tidyverse","dplyr","readxl","umap","dbscan","fpc","Rtsne","glmnet")
+for (package in packages) {
+  if (!requireNamespace(package, quietly = TRUE)) {
+    install.packages(package)
+  }
+}
+lapply(packages,library, character.only=T)
+```
+
+Reading in the data
+
+```{r}
+#Read in the datasets "Embeddings_text", "features", & wordEmbeddings and merge them
+sentences <- read.csv(here("data","Embeddings_text.csv"))
+structure <- read_excel(here("data","wordEmbeddings.xlsx"))
+embeddings <- read.csv(here("data","features.csv"))
+embeddings2 <- read.csv(here("data","features2.csv"))
+embeddings_word <- read.csv(here("data","features_word.csv"))
+
+# Modify the structure dataframe
+structure <- structure %>%
+  mutate(sentence = sentences$word.comment) %>%
+  select(-`word+comment`)
+
+# Combine structure and embeddings dataframes
+climateact <- cbind(structure, select(embeddings2,-1))
+climateact_word <- cbind(structure, select(embeddings_word,-1))
+
+# Import the new CSV file
+additional_data <- read.csv(here("data","all_surveys.csv"))
+
+# Left join on the 'personID' column of climateact with the 'participantID' column of additional_data
+climateact <- left_join(climateact, 
+                        select(additional_data, participantID, intendedVote, ratingLaw, mean_valence_macro), 
+                        by = c("personID" = "participantID"))
+
+climateact_word <- left_join(climateact, 
+                        select(additional_data, participantID, intendedVote, ratingLaw, mean_valence_macro), 
+                        by = c("personID" = "participantID"))
+
+# Rearrange the columns to place the new columns at positions 11-13
+cols <- c(1:10, (ncol(climateact)-2):ncol(climateact), 11:(ncol(climateact)-3))
+climateact <- climateact[, cols]
+
+climateact_word <- climateact_word[, cols]
+
+# Check the first few rows of the merged data to ensure correctness
+head(climateact)
+head(climateact_word)
+```
+```{r}
+set.seed(123)
+# 1) Regression with mean_valence_macro as the independent variable 
+# and intendedVote as the dependent variable using basic logistic regression.
+model1 <- glm(intendedVote ~ mean_valence_macro, 
+             data = climateact, 
+             family = binomial(link = "logit"))
+
+summary(model1)
+
+# Continue with the regularized regressions for model2 and model3...
+
+# Extract embeddings for model2 and model3 from word+comment
+embedding_cols <- paste("X", 0:383, sep = "")
+X2 <- as.matrix(climateact[, embedding_cols])
+Y <- climateact$intendedVote
+
+# 2) Regression with the embeddings as independent variables and 
+# intendedVote as the dependent variable using Elastic Net.
+model2 <- glmnet(X2, Y, family = "binomial", alpha = 0.5)
+cv.model2 <- cv.glmnet(X2, Y, family = "binomial", alpha = 0.5)
+print(cv.model2)
+
+# 3) Regression with the embeddings as independent variables and mean_valence_macro,
+# with intendedVote as the dependent variable using Elastic Net.
+X3 <- as.matrix(climateact[, c("mean_valence_macro",embedding_cols)])
+model3 <- glmnet(X3, Y, family = "binomial", alpha = 0.5)
+cv.model3 <- cv.glmnet(X3, Y, family = "binomial", alpha = 0.5)
+print(cv.model3)
+
+# Extract embeddings for model4 and model5 from "word" embeddings
+embedding_cols <- paste("X", 0:383, sep = "")
+X4 <- as.matrix(climateact_word[, embedding_cols])
+Y2 <- climateact_word$intendedVote
+
+# 2) Regression with the embeddings as independent variables and 
+# intendedVote as the dependent variable using Elastic Net.
+model4 <- glmnet(X4, Y, family = "binomial", alpha = 0.5)
+cv.model4 <- cv.glmnet(X4, Y, family = "binomial", alpha = 0.5)
+print(cv.model4)
+
+# 3) Regression with the embeddings as independent variables and mean_valence_macro,
+# with intendedVote as the dependent variable using Elastic Net.
+X5 <- as.matrix(climateact_word[, c("mean_valence_macro.x",embedding_cols)])
+model5 <- glmnet(X5, Y, family = "binomial", alpha = 0.5)
+cv.model5 <- cv.glmnet(X5, Y, family = "binomial", alpha = 0.5)
+print(cv.model5)
+```
+
+```{r}
+# 1. Extract the nonzero coefficients at lambda.min from model2
+coefficients_model2 <- coef(model2, s = cv.model2$lambda.min)
+
+# 2. Identify the embedding columns that correspond to these nonzero coefficients
+nonzero_coeff_names <- rownames(coefficients_model2)[coefficients_model2[, 1] != 0]
+nonzero_embedding_cols <- nonzero_coeff_names[nonzero_coeff_names %in% embedding_cols]
+
+# 3. Create climateact_opt by selecting only these columns
+# (along with other columns from climateact that aren't embeddings)
+non_embedding_cols <- setdiff(colnames(climateact), embedding_cols)
+all_relevant_cols <- c(non_embedding_cols, nonzero_embedding_cols)
+
+climateact_opt <- climateact[, all_relevant_cols]
+```
+
+```{r}
+#Visualize the embeddings from climateact and from climateact_opt
+# 1. Visualize all embeddings from the climateact dataframe
+
+# Extract the embeddings from the climateact dataframe
+embeddings_climateact <- as.matrix(climateact[, embedding_cols])
+
+# Perform t-SNE
+set.seed(123) # for reproducibility
+tsne_climateact <- Rtsne(embeddings_climateact, is_distance = FALSE, perplexity = 30, check_duplicates = FALSE)
+
+# Plot t-SNE results
+plot1 <- ggplot(NULL, aes(x = tsne_climateact$Y[, 1], y = tsne_climateact$Y[, 2])) +
+  geom_point(alpha = 0.6) +
+  labs(title = "t-SNE of embeddings from climateact dataframe")
+
+print(plot1)
+
+
+# 2. Visualize embeddings from the climateact_opt dataframe
+
+# Extract the embeddings from the climateact_opt dataframe
+embeddings_climateact_opt <- as.matrix(climateact_opt[, nonzero_embedding_cols])
+
+# Perform t-SNE
+set.seed(123) # for reproducibility
+tsne_climateact_opt <- Rtsne(embeddings_climateact_opt, is_distance = FALSE, perplexity = 30, check_duplicates = FALSE)
+
+# Plot t-SNE results
+plot2 <- ggplot(NULL, aes(x = tsne_climateact_opt$Y[, 1], y = tsne_climateact_opt$Y[, 2])) +
+  geom_point(alpha = 0.6) +
+  labs(title = "t-SNE of embeddings from climateact_opt dataframe")
+
+print(plot2)
+
+#3 Visualize word embeddings
+embeddings_climateact_word <- as.matrix(climateact_word[, embedding_cols])
+# Perform t-SNE
+set.seed(123) # for reproducibility
+tsne_climateact_word <- Rtsne(embeddings_climateact_word, is_distance = FALSE, perplexity = 30, check_duplicates = FALSE)
+
+# Plot t-SNE results
+plot3 <- ggplot(NULL, aes(x = tsne_climateact_word$Y[, 1], y = tsne_climateact_word$Y[, 2])) +
+  geom_point(alpha = 0.6) +
+  labs(title = "t-SNE of word embeddings")
+
+print(plot3)
+```
+
+```{r}
+#First clustering approach: UMAP Dimensionality reduction
+#Dimensionality Reduction 2 Dimensions
+#First scale the embeddings
+scaled_embeddings_word <- scale(embeddings_climateact_word)
+#Change Arguments of umap
+custom.settings <- umap.defaults
+custom.settings$random_state = 26 #set seed for reproducibility
+custom.settings$transform_state = 26 #set seed for reproducibility
+custom.settings$n_neighbors = 8
+
+#Perform dimensionality reduction on embeddings with umap
+umap_result_2 <- umap::umap(scaled_embeddings_word,custom.settings)
+
+#Visualize the results
+plot(umap_result_2$layout[,1],umap_result_2$layout[,2], main = "UMAP Reduction", xlab="UMAP 1", ylab = "UMAP 2")
+```
+
+```{r}
+#Cluster umap results
+db_result_umap <- dbscan::dbscan(umap_result_2$layout, eps = 12, minPts = 5)
+
+# Count of data points in each cluster
+cluster_counts_umap <- table(db_result_umap$cluster)
+
+# Display the clustering results
+print(cluster_counts_umap)
+
+# Number of clusters (excluding noise)
+num_clusters_umap <- length(unique(db_result_umap$cluster)) - 1  # Subtracting 1 to exclude noise
+cat("Number of clusters:", num_clusters_umap, "\n")
+
+# Number of noise points
+num_noise_umap <- sum(db_result_umap$cluster == 0)
+cat("Number of noise points:", num_noise_umap, "\n")
+```
+
+```{r}
+#Cluster raw set
+db_result_nored <- dbscan::dbscan(embeddings_climateact_word, eps = 12, minPts = 5)
+
+# Count of data points in each cluster
+cluster_counts_nored <- table(db_result_nored$cluster)
+
+# Display the clustering results
+print(cluster_counts_nored)
+
+# Number of clusters (excluding noise)
+num_clusters_nored <- length(unique(db_result_nored$cluster)) - 1  # Subtracting 1 to exclude noise
+cat("Number of clusters:", num_clusters_nored, "\n")
+
+# Number of noise points
+num_noise_nored <- sum(db_result_nored$cluster == 0)
+cat("Number of noise points:", num_noise_nored, "\n")
+```
+
+
+```{r}
+#Principal Component Analysis to reduce to important dimensions
+# Loading required library
+library(stats)
+set.seed(123)
+# Scaling the embeddings
+scaled_embeddings_word <- scale(embeddings_climateact_word)
+
+# Applying PCA
+pca_result <- prcomp(scaled_embeddings_word, center = TRUE, scale. = TRUE)
+
+# Plotting the variance explained by each principal component
+explained_variance_ratio <- pca_result$sdev^2 / sum(pca_result$sdev^2)
+cum_explained_variance <- cumsum(explained_variance_ratio)
+plot(explained_variance_ratio, type = "b", main="Explained Variance by Principal Components",
+     xlab = "Principal Component", ylab = "Explained Variance Ratio")
+
+plot(cum_explained_variance, type = "b", main="Cumulative Explained Variance",
+     xlab = "Number of Principal Components", ylab = "Cumulative Explained Variance Ratio",
+     ylim=c(0.8,1), yaxp=c(0.8,1,4))  # Here, it's divided into 0.8, 0.85, 0.9, 0.95, 1
+
+#By inspecting the Cumulative graph, choose what number of components explain 95% of variance
+```
+
+```{r}
+# Project the data onto the first 100 principal components
+pca_transformed_data <- pca_result$x[, 1:100]
+```
+
+```{r}
+# Apply DBSCAN on PCA reduced set
+db_result <- dbscan::dbscan(pca_transformed_data, eps = 15, minPts = 5)
+
+# Count of data points in each cluster
+cluster_counts <- table(db_result$cluster)
+
+# Display the clustering results
+print(cluster_counts)
+
+# Number of clusters (excluding noise)
+num_clusters <- length(unique(db_result$cluster)) - 1  # Subtracting 1 to exclude noise
+cat("Number of clusters:", num_clusters, "\n")
+
+# Number of noise points
+num_noise <- sum(db_result$cluster == 0)
+cat("Number of noise points:", num_noise, "\n")
+```
+
+```{r}
+#Visualize the umap reduced clusters
+# Create a dataframe for plotting
+plot_df_umap <- data.frame(umap_result_2$layout)
+colnames(plot_df_umap) <- c("UMAP1", "UMAP2")
+plot_df_umap$cluster <- as.factor(db_result_umap$cluster)
+
+# Plot the UMAP results colored by cluster assignment
+ggplot(plot_df_umap, aes(x = UMAP1, y = UMAP2, color = cluster)) +
+  geom_point(alpha = 0.6) +
+  scale_color_brewer(palette = "Set1", na.value = "grey50") +
+  labs(title = "UMAP visualization with DBSCAN clustering", color = "Cluster") +
+  theme_minimal()
+```
+```{r}
+#Visualize the PCA reduced clusters
+# Create a dataframe for plotting
+plot_data <- data.frame(pca_transformed_data, Cluster = as.factor(db_result$cluster))
+
+# Filter out the noise cluster
+plot_data_filtered <- plot_data %>% filter(Cluster != 0)
+
+#Create color palette
+col25 <- c(
+  "dodgerblue2", "#E31A1C", # red
+  "green4",
+  "#6A3D9A", # purple
+  "#FF7F00", # orange
+  "black", "gold1",
+  "skyblue2", "#FB9A99", # lt pink
+  "palegreen2",
+  "#CAB2D6", # lt purple
+  "#FDBF6F", # lt orange
+  "gray70", "khaki2",
+  "maroon", "orchid1", "deeppink1", "blue1", "steelblue4",
+  "darkturquoise", "green1", "yellow4", "yellow3",
+  "darkorange4", "brown"
+)
+
+# Add cluster assignment to the dataframe
+plot_data_filtered$Cluster <- db_result$cluster[db_result$cluster != 0]
+
+# Visualize the clusters using ggplot2 with jitter
+ggplot(plot_data_filtered, aes(x = PC1, y = PC2, color = as.factor(Cluster))) +  
+  geom_point(size = 2, alpha = 0.5) + 
+  scale_color_manual(values = col25) +
+  labs(title = "PCA visualization with DBSCAN clustering (excluding noise)",
+       x = "PC1",
+       y = "PC2",
+       color = "Cluster") +
+  theme_minimal() +
+  theme(legend.position = "right")
+```
+
+
+```{r}
+#Create dataframe to inspect cluster with words
+# Extract columns 2:12 from the climateact_word dataset
+Climateact_word_selected <- climateact_word[, 2:12]
+
+# Add the cluster assignments from both PCA and UMAP to the extracted dataframe
+Climateact_word_selected$pca_Cluster <- db_result$cluster
+Climateact_word_selected$umap_cluster <- db_result_umap$cluster
+
+# Rename the resulting dataframe
+Climateact_word_clustered <- Climateact_word_selected
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r,eval=F}
+#Dimensionality Reduction 2 Dimensions
+#Change Arguments of umap
+custom.settings <- umap.defaults
+custom.settings$random_state = 26 #set seed for reproducibility
+custom.settings$transform_state = 26 #set seed for reproducibility
+
+#Perform dimensionality reduction on embeddings with umap
+umap_result_2 <- umap::umap(climateact[,-c(1:11)],custom.settings) #exclude non-embedding columns
+
+#Visualize the results
+plot(umap_result_2$layout[,1],umap_result_2$layout[,2], main = "UMAP Reduction", xlab="UMAP 1", ylab = "UMAP 2")
+
+#Check trustworthiness and continuity score to evaluate fit
+#Between 0-1, the higher the better, >= 0.8 is seen as good
+#------No package to check trustworthiness and continuity!!
+
+```
+
+```{r, eval=F}
+#Dimensionality Reduction 30 Dimensions and 20 neighbors
+#Change Arguments of umap
+custom.settings30 <- umap.defaults
+custom.settings30$random_state = 26 #set seed for reproducibility
+custom.settings30$transform_state = 26 #set seed for reproducibility
+custom.settings30$n_components = 30 #30 dimensions
+custom.settings30$n_neighbors = 20
+
+#Perform dimensionality reduction on embeddings with umap
+umap_result_30 <- umap(climateact[,-c(1:11)],custom.settings30) #exclude non-embedding columns
+
+#Visualize the results
+plot(umap_result_30$layout[,1],umap_result_30$layout[,2], main = "UMAP Reduction", xlab="UMAP 1", ylab = "UMAP 2")
+
+#Check trustworthiness and continuity score to evaluate fit
+#Between 0-1, the higher the better, >= 0.8 is seen as good
+#------No package to check trustworthiness and continuity!!
+
+```
+
+```{r, eval=F}
+#Dimensionality Reduction 10 Dimensions with 25 neighbors
+#Change Arguments of umap
+custom.settings10 <- umap.defaults
+custom.settings10$random_state = 26 #set seed for reproducibility
+custom.settings10$transform_state = 26 #set seed for reproducibility
+custom.settings10$n_components = 10 #10 dimensions
+custom.settings10$n_neighbors = 25
+
+#Perform dimensionality reduction on embeddings with umap
+umap_result_10 <- umap(climateact[,-c(1:11)],custom.settings10) #exclude non-embedding columns
+
+#Visualize the results
+plot(umap_result_10$layout[,1],umap_result_10$layout[,2], main = "UMAP Reduction", xlab="UMAP 1", ylab = "UMAP 2")
+
+#Check trustworthiness and continuity score to evaluate fit
+#Between 0-1, the higher the better, >= 0.8 is seen as good
+#------No package to check trustworthiness and continuity!!
+
+```
+
+```{r,eval=F}
+#Dimensionality Reduction 2 Dimensions with 30 neighbors
+#Change Arguments of umap
+custom.settingsb <- umap.defaults
+custom.settingsb$random_state = 26 #set seed for reproducibility
+custom.settingsb$transform_state = 26 #set seed for reproducibility
+custom.settingsb$n_neighbors = 30
+
+#Perform dimensionality reduction on embeddings with umap
+umap_result_2b <- umap::umap(climateact[,-c(1:11)],custom.settingsb) #exclude non-embedding columns
+
+#Visualize the results
+plot(umap_result_2b$layout[,1],umap_result_2b$layout[,2], main = "UMAP Reduction", xlab="UMAP 1", ylab = "UMAP 2")
+
+#Check trustworthiness and continuity score to evaluate fit
+#Between 0-1, the higher the better, >= 0.8 is seen as good
+#------No package to check trustworthiness and continuity!!
+
+```
+
+```{r,eval=F}
+#Perform clustering with DBSCAN (Density-Based Spatial Clustering)
+#dbscan is useful when clusters may have irregular shapes and varying densities and is robust against noise and outliers.
+
+#Find suitable DBSCAN parameters by inspecting kNN plot
+#Use minPts = 3 because n dimensions + 1
+kNNdistplot(umap_result_2$layout, minPts = 3) #turning point at around 0.1
+# Add a vertical line at x = 6400
+abline(v = 6450)
+abline(h = 0.156, col = "red")
+text(6000,0.2,"eps = 0.15", cex= 0.5)
+# Label the y-value at the turning point
+```
+
+```{r,eval=F}
+#set seed and cluster with eps = .15 and minPts = 3
+set.seed(26)
+dbscan_result <- dbscan(umap_result_2$layout, eps = 0.15, MinPts = 3)
+
+# Add the DBSCAN cluster assignments to your dataframe
+climateact$DBSCAN_cluster <- dbscan_result$cluster
+
+# Check the noise points (those with cluster ID 0)
+noise_points <- sum(dbscan_result$cluster == 0)
+
+# Print the number of clusters and noise points
+cat("Number of clusters:", max(dbscan_result$cluster), "\n")
+cat("Number of noise points:", noise_points, "\n")
+
+#Plot the clusters
+eps015_mpts3 <- plot(dbscan_result,umap_result_2$layout, main = "Cluster eps 0.15, MinPts 3", xlab = "Dim1", ylab = "Dim2")
+text(13, 14, labels = "Clusters = 136 \n Noise points = 154", pos = 3, cex = 0.5)
+
+#136 clusters are too many. Reducing clusters by adjusting eps and minPts
+```
+
+```{r, eval=F}
+#When looking at the cluster graph, there seem to be a lot of small clusters. We are first going to increase eps
+set.seed(26)
+dbscan_resultb <- dbscan(umap_result_2$layout, eps = 0.3, MinPts = 3)
+
+# Add the DBSCAN cluster assignments to your dataframe
+climateact$DBSCAN_clusterb <- dbscan_resultb$cluster
+
+# Check the noise points (those with cluster ID 0)
+noise_pointsb <- sum(dbscan_resultb$cluster == 0)
+
+# Print the number of clusters and noise points
+cat("Number of clusters:", max(dbscan_resultb$cluster), "\n")
+cat("Number of noise points:", noise_pointsb, "\n")
+
+#Plot the clusters
+eps03_mpts3 <- plot(dbscan_resultb,umap_result_2$layout,main = "Cluster eps 0.3, MinPts 3", xlab = "Dim1", ylab = "Dim2")
+text(13, 14, labels = "Clusters = 55 \n Noise points = 12", pos = 3, cex = 0.5)
+```
+
+```{r, eval=F}
+#Now we want to increase the MinPts to further reduce the number of clusters. MinPts represent the minimum number of data points to form a cluster
+set.seed(26)
+dbscan_resultc <- dbscan(umap_result_2$layout, eps = 0.3, MinPts = 30)
+
+# Add the DBSCAN cluster assignments to your dataframe
+climateact$DBSCAN_clusterc <- dbscan_resultc$cluster
+
+# Check the noise points (those with cluster ID 0)
+noise_pointsc <- sum(dbscan_resultc$cluster == 0)
+
+# Print the number of clusters and noise points
+cat("Number of clusters:", max(dbscan_resultc$cluster), "\n")
+cat("Number of noise points:", noise_pointsc, "\n")
+
+#Plot the clusters
+eps03_mpts30 <- plot(dbscan_resultc,umap_result_2$layout,main = "Cluster eps 0.3, MinPts 30", xlab = "Dim1", ylab = "Dim2")
+text(13, 14, labels = "Clusters = 56 \n Noise points = 1116", pos = 3, cex = 0.5)
+```
+
+```{r,eval=F}
+#We will now increase the eps since before there were a lot of noise points.
+set.seed(26)
+dbscan_resultd <- dbscan(umap_result_2$layout, eps = 0.5, MinPts = 30)
+
+# Check the noise points (those with cluster ID 0)
+noise_pointsd <- sum(dbscan_resultd$cluster == 0)
+noised <- dbscan_resultd$cluster == 0
+
+# Print the number of clusters and noise points
+cat("Number of clusters:", max(dbscan_resultd$cluster), "\n")
+cat("Number of noise points:", noise_pointsd, "\n")
+
+#Remove the noise points from cluster results
+dbscan_resultd$cluster_clean <- dbscan_resultd$cluster[!noised]
+
+#remove noise points from umap
+umap_result_2_clean <- umap_result_2
+umap_result_2_clean$layout <- umap_result_2$layout[!noised,1:2]
+
+
+# Add the DBSCAN cluster assignments to climateact df
+climateact$DBSCAN_clusterd <- dbscan_resultd$cluster
+
+#Plot the clusters
+#Color Palette with 25 colors
+col25 <- c(
+  "dodgerblue2", "#E31A1C", # red
+  "green4",
+  "#6A3D9A", # purple
+  "#FF7F00", # orange
+  "black", "gold1",
+  "skyblue2", "#FB9A99", # lt pink
+  "palegreen2",
+  "#CAB2D6", # lt purple
+  "#FDBF6F", # lt orange
+  "gray70", "khaki2",
+  "maroon", "orchid1", "deeppink1", "blue1", "steelblue4",
+  "darkturquoise", "green1", "yellow4", "yellow3",
+  "darkorange4", "brown"
+)
+eps05_mpts30 <- plot(umap_result_2_clean$layout[,1],umap_result_2_clean$layout[,2],col=col25[sort(dbscan_resultd$cluster_clean)],main = "Cluster eps 0.5, MinPts 30", xlab = "Dim1", ylab = "Dim2")
+text(13, 14, labels = "Clusters = 24 \n Noise points = 294", pos = 3, cex = 0.5)
+
+#24 clusters and 294 noise points seem very good. We will now evaluate the fit of the clusters.
+```
+
+```{r,eval=F}
+# Load the required library
+if (!requireNamespace("cluster", quietly = TRUE)) {
+  # If not installed, install the package
+  install.packages("cluster")
+}
+library(cluster)
+
+# Calculate silhouette score
+sil.dbscan <- silhouette(dbscan_resultd$cluster_clean, dist((umap_result_2_clean$layout)))
+summary(sil.dbscan)
+
+#Plot Silhouette
+col25 <- c(
+  "dodgerblue2", "#E31A1C", # red
+  "green4",
+  "#6A3D9A", # purple
+  "#FF7F00", # orange
+  "black", "gold1",
+  "skyblue2", "#FB9A99", # lt pink
+  "palegreen2",
+  "#CAB2D6", # lt purple
+  "#FDBF6F", # lt orange
+  "gray70", "khaki2",
+  "maroon", "orchid1", "deeppink1", "blue1", "steelblue4",
+  "darkturquoise", "green1", "yellow4", "yellow3",
+  "darkorange4", "brown"
+)
+plot(sil.dbscan, col=col25[sort(dbscan_resultd$cluster_clean)])
+#Doesn't work
+```
+
+
+```{r,eval=F}
+#Perform Clustering with fpc (Fuzzy Clustering and Partitioning)
+#Benefits of fpc: data points may belong to multiple clusters with varying degrees of membership
+# Set the maximum number of clusters to consider
+k_max <- 20
+
+# Initialize variables to store cluster validity measures
+cluster_silwidths <- numeric(k_max)
+
+# Iterate through different numbers of clusters
+# Calculate silhouette scores for different numbers of clusters
+for (k in 2:k_max) {  # Start from 2, as 1 cluster doesn't provide meaningful information
+  kmeans_result <- kmeans(umap_result$layout, centers = k, nstart = 25)
+  sil_scores <- silhouette(kmeans_result$cluster, dist(umap_result$layout))
+  cluster_silwidths[k] <- mean(sil_scores[, "sil_width"])
+}
+
+
+# Find the optimal number of clusters based on silhouette width
+optimal_k <- which.max(cluster_silwidths)
+
+# Perform clustering with the optimal number of clusters
+optimal_kmeans <- kmeans(umap_result$layout, centers = optimal_k, nstart = 25)
+
+# Add a new column 'cluster' to 'climateact' with cluster assignments
+climateact$cluster <- optimal_kmeans$cluster
+
+```
+
