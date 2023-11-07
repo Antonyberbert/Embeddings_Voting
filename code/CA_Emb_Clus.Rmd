@@ -206,7 +206,7 @@ plot4 <- ggplot(NULL, aes(x = tsne_climateact_new$Y[, 1], y = tsne_climateact_ne
 print(plot4)
 ```
 
-```{r}
+```{r,eval=F,echo=F}
 #First clustering approach: UMAP Dimensionality reduction
 #Dimensionality Reduction 2 Dimensions
 #First scale the embeddings
@@ -237,7 +237,7 @@ umap_result_new <- umap::umap(scaled_embeddings_new,custom.settings)
 plot(umap_result_new$layout[,1],umap_result_new$layout[,2], main = "UMAP Reduction new", xlab="UMAP 1", ylab = "UMAP 2")
 ```
 
-```{r}
+```{r,eval=F,echo=F}
 #Cluster umap results
 db_result_umap <- dbscan::dbscan(umap_result_2$layout, eps = 12, minPts = 5)
 
@@ -273,7 +273,7 @@ num_noise_umap_new <- sum(db_result_umap_new$cluster == 0)
 cat("Number of noise points:", num_noise_umap_new, "\n")
 ```
 
-```{r}
+```{r,eval=F,echo=F}
 #Cluster raw set
 db_result_nored <- dbscan::dbscan(embeddings_climateact_word, eps = 12, minPts = 5)
 
@@ -293,7 +293,7 @@ cat("Number of noise points:", num_noise_nored, "\n")
 ```
 
 
-```{r}
+```{r,eval=F,echo=F}
 #Principal Component Analysis to reduce to important dimensions
 # Loading required library
 set.seed(123)
@@ -316,12 +316,12 @@ plot(cum_explained_variance, type = "b", main="Cumulative Explained Variance",
 #By inspecting the Cumulative graph, choose what number of components explain 95% of variance
 ```
 
-```{r}
+```{r,echo=F,eval=F}
 # Project the data onto the first 100 principal components
 pca_transformed_data <- pca_result$x[, 1:100]
 ```
 
-```{r}
+```{r,echo=F,eval=F}
 # Apply DBSCAN on PCA reduced set
 set.seed(123)
 db_result <- dbscan::dbscan(pca_transformed_data, eps = 15, minPts = 5)
@@ -346,6 +346,7 @@ cat("Number of noise points:", num_noise, "\n")
 set.seed(123)
 
 # Applying PCA
+scaled_embeddings_new <- scale(embeddings_climateact_new)
 pca_result_new <- prcomp(scaled_embeddings_new, center = TRUE, scale. = TRUE)
 
 # Plotting the variance explained by each principal component
@@ -361,7 +362,7 @@ plot(cum_explained_variance_new, type = "b", main="Cumulative Explained Variance
 #By inspecting the Cumulative graph, choose what number of components explain 95% of variance
 ```
 ```{r}
-# Project the data onto the first 100 principal components
+# Project the data onto the first 300 principal components
 pca_transformed_data_new <- pca_result_new$x[, 1:300]
 ```
 
@@ -379,7 +380,7 @@ ggplot() +
 ```
 
 
-```{r}
+```{r,eval=F, echo=F}
 # Apply DBSCAN on PCA reduced set
 db_result_new <- dbscan::dbscan(pca_transformed_data_new, eps = 30, minPts = 10)
 
@@ -397,8 +398,68 @@ cat("Number of clusters:", num_clusters_new, "\n")
 num_noise_new <- sum(db_result_new$cluster == 0)
 cat("Number of noise points:", num_noise_new, "\n")
 ```
-
 ```{r}
+#Trying out different parameters
+# Apply DBSCAN on PCA reduced set
+db_result_new2 <- dbscan::dbscan(pca_transformed_data_new, eps = 15, minPts = 5)
+
+# Count of data points in each cluster
+cluster_counts_new2 <- table(db_result_new2$cluster)
+
+# Display the clustering results
+print(cluster_counts_new2)
+
+# Number of clusters (excluding noise)
+num_clusters_new2 <- length(unique(db_result_new2$cluster)) - 1  # Subtracting 1 to exclude noise
+cat("Number of clusters:", num_clusters_new2, "\n")
+
+# Number of noise points
+num_noise_new2 <- sum(db_result_new2$cluster == 0)
+cat("Number of noise points:", num_noise_new2, "\n")
+```
+
+```{r, eval=F, echo=F}
+#Trying out different parameters
+# Apply DBSCAN on PCA reduced set
+db_result_new3 <- dbscan::dbscan(pca_transformed_data_new, eps = 23, minPts = 5)
+
+# Count of data points in each cluster
+cluster_counts_new3 <- table(db_result_new3$cluster)
+
+# Display the clustering results
+print(cluster_counts_new3)
+
+# Number of clusters (excluding noise)
+num_clusters_new3 <- length(unique(db_result_new3$cluster)) - 1  # Subtracting 1 to exclude noise
+cat("Number of clusters:", num_clusters_new3, "\n")
+
+# Number of noise points
+num_noise_new3 <- sum(db_result_new3$cluster == 0)
+cat("Number of noise points:", num_noise_new3, "\n")
+```
+```{r, eval=F, echo=F}
+#Trying out different parameters
+# Apply DBSCAN on PCA reduced set
+db_result_new4 <- dbscan::dbscan(pca_transformed_data_new, eps = 25, minPts = 3)
+
+# Count of data points in each cluster
+cluster_counts_new4 <- table(db_result_new4$cluster)
+
+# Display the clustering results
+print(cluster_counts_new4)
+
+# Number of clusters (excluding noise)
+num_clusters_new4 <- length(unique(db_result_new4$cluster)) - 1  # Subtracting 1 to exclude noise
+cat("Number of clusters:", num_clusters_new4, "\n")
+
+# Number of noise points
+num_noise_new4 <- sum(db_result_new4$cluster == 0)
+cat("Number of noise points:", num_noise_new4, "\n")
+```
+
+
+
+```{r,eval=F,echo=f}
 #Visualize the umap reduced clusters
 col25 <- c(
   "dodgerblue2", "#E31A1C", # red
@@ -510,12 +571,79 @@ Climateact_word_selected$pca_cluster <- db_result$cluster
 Climateact_word_selected$umap_cluster <- db_result_umap$cluster
 Climateact_word_selected$new_umap_cluster <- db_result_umap_new$cluster
 Climateact_word_selected$new_pca_cluster <- db_result_new$cluster
+Climateact_word_selected$new2_pca_cluster <- db_result_new2$cluster
+Climateact_word_selected$new3_pca_cluster <- db_result_new3$cluster
+
 
 # Rename the resulting dataframe
 Climateact_word_clustered <- Climateact_word_selected
 write_xlsx(Climateact_word_clustered, "Climateact_word_clustered.xlsx")
 
 View(Climateact_word_clustered)
+```
+
+```{r}
+#Creating new df with the 0 clusters to cluster them again separately.
+climateact_rest <- cbind(climateact_word[,2:12],climateact_word_selected$new2_pca_cluster,embeddings_climateact_new)
+climateact_rest%>%
+  filter(new2_pca_cluster==0)
+embeddings_rest <- as.matrix(climateact_rest[, embedding_cols_new])
+
+# Perform t-SNE
+set.seed(123) # for reproducibility
+tsne_climateact_rest <- Rtsne(embeddings_rest, is_distance = FALSE, perplexity = 30, check_duplicates = FALSE)
+
+# Plot t-SNE results
+plot_rest <- ggplot(NULL, aes(x = tsne_climateact_rest$Y[, 1], y = tsne_climateact_rest$Y[, 2])) +
+  geom_point(alpha = 0.6) +
+  labs(title = "t-SNE of rest embeddings")
+
+print(plot_rest)
+```
+
+```{r}
+#Principal Component Analysis to reduce to important dimensions for rest embeddings
+set.seed(123)
+
+# Applying PCA
+scaled_embeddings_rest <- scale(embeddings_rest)
+pca_result_rest <- prcomp(scaled_embeddings_rest, center = TRUE, scale. = TRUE)
+
+# Plotting the variance explained by each principal component
+explained_variance_ratio_rest <- pca_result_rest$sdev^2 / sum(pca_result_rest$sdev^2)
+cum_explained_variance_rest <- cumsum(explained_variance_ratio_rest)
+plot(explained_variance_ratio_rest, type = "b", main="Explained Variance by Principal Components",
+     xlab = "Principal Component", ylab = "Explained Variance Ratio")
+
+plot(cum_explained_variance_rest, type = "b", main="Cumulative Explained Variance",
+     xlab = "Number of Principal Components", ylab = "Cumulative Explained Variance Ratio",
+     ylim=c(0.8,1), yaxp=c(0.8,1,4))  # Here, it's divided into 0.8, 0.85, 0.9, 0.95, 1
+
+#By inspecting the Cumulative graph, choose what number of components explain 95% of variance
+```
+
+```{r}
+# Project the data onto the first 100 principal components
+pca_transformed_data_rest <- pca_result_rest$x[, 1:300]
+```
+
+```{r}
+# Apply DBSCAN on PCA reduced set
+db_result_rest <- dbscan::dbscan(pca_transformed_data_rest, eps = 15, minPts = 5)
+
+# Count of data points in each cluster
+cluster_counts_rest <- table(db_result_rest$cluster)
+
+# Display the clustering results
+print(cluster_counts_rest)
+
+# Number of clusters (excluding noise)
+num_clusters_rest <- length(unique(db_result_rest$cluster)) - 1  # Subtracting 1 to exclude noise
+cat("Number of clusters:", num_clusters_rest, "\n")
+
+# Number of noise points
+num_noise_rest <- sum(db_result_rest$cluster == 0)
+cat("Number of noise points:", num_noise_rest, "\n")
 ```
 
 ```{r,eval=F,echo=F}
