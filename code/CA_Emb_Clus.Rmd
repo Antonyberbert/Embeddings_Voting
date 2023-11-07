@@ -293,7 +293,7 @@ cat("Number of noise points:", num_noise_nored, "\n")
 ```
 
 
-```{r,eval=F,echo=F}
+```{r}
 #Principal Component Analysis to reduce to important dimensions
 # Loading required library
 set.seed(123)
@@ -316,7 +316,7 @@ plot(cum_explained_variance, type = "b", main="Cumulative Explained Variance",
 #By inspecting the Cumulative graph, choose what number of components explain 95% of variance
 ```
 
-```{r,echo=F,eval=F}
+```{r}
 # Project the data onto the first 100 principal components
 pca_transformed_data <- pca_result$x[, 1:100]
 ```
@@ -398,9 +398,11 @@ cat("Number of clusters:", num_clusters_new, "\n")
 num_noise_new <- sum(db_result_new$cluster == 0)
 cat("Number of noise points:", num_noise_new, "\n")
 ```
+
 ```{r}
 #Trying out different parameters
 # Apply DBSCAN on PCA reduced set
+set.seed(123)
 db_result_new2 <- dbscan::dbscan(pca_transformed_data_new, eps = 15, minPts = 5)
 
 # Count of data points in each cluster
@@ -437,6 +439,7 @@ cat("Number of clusters:", num_clusters_new3, "\n")
 num_noise_new3 <- sum(db_result_new3$cluster == 0)
 cat("Number of noise points:", num_noise_new3, "\n")
 ```
+
 ```{r, eval=F, echo=F}
 #Trying out different parameters
 # Apply DBSCAN on PCA reduced set
@@ -459,7 +462,7 @@ cat("Number of noise points:", num_noise_new4, "\n")
 
 
 
-```{r,eval=F,echo=f}
+```{r}
 #Visualize the umap reduced clusters
 col25 <- c(
   "dodgerblue2", "#E31A1C", # red
@@ -538,7 +541,9 @@ ggplot(plot_data_filtered, aes(x = PC1, y = PC2, color = as.factor(Cluster))) +
        color = "Cluster") +
   theme_minimal() +
   theme(legend.position = "right")
+```
 
+```{r}
 #Plot PCA new embeddings
 # Create a dataframe for plotting
 plot_data_new <- data.frame(pca_transformed_data_new, Cluster = as.factor(db_result_new$cluster))
@@ -564,29 +569,29 @@ ggplot(plot_data_filtered_new, aes(x = PC1, y = PC2, color = as.factor(Cluster))
 ```{r}
 #Create dataframe to inspect cluster with words
 # Extract columns 2:12 from the climateact_word dataset
-Climateact_word_selected <- climateact_word[, 2:12]
+climateact_word_selected <- climateact_word[, 2:12]
 
 # Add the cluster assignments from both PCA and UMAP to the extracted dataframe
-Climateact_word_selected$pca_cluster <- db_result$cluster
-Climateact_word_selected$umap_cluster <- db_result_umap$cluster
-Climateact_word_selected$new_umap_cluster <- db_result_umap_new$cluster
-Climateact_word_selected$new_pca_cluster <- db_result_new$cluster
-Climateact_word_selected$new2_pca_cluster <- db_result_new2$cluster
-Climateact_word_selected$new3_pca_cluster <- db_result_new3$cluster
+#Climateact_word_selected$pca_cluster <- db_result$cluster
+#Climateact_word_selected$umap_cluster <- db_result_umap$cluster
+#Climateact_word_selected$new_umap_cluster <- db_result_umap_new$cluster
+#Climateact_word_selected$new_pca_cluster <- db_result_new$cluster
+climateact_word_selected$new2_pca_cluster <- db_result_new2$cluster
+#Climateact_word_selected$new3_pca_cluster <- db_result_new3$cluster
 
 
 # Rename the resulting dataframe
-Climateact_word_clustered <- Climateact_word_selected
-write_xlsx(Climateact_word_clustered, "Climateact_word_clustered.xlsx")
+climateact_word_clustered <- climateact_word_selected
+write_xlsx(climateact_word_clustered, "Climateact_word_clustered.xlsx")
 
-View(Climateact_word_clustered)
+View(climateact_word_clustered)
 ```
 
 ```{r}
 #Creating new df with the 0 clusters to cluster them again separately.
 climateact_rest <- cbind(climateact_word[,2:12],climateact_word_selected$new2_pca_cluster,embeddings_climateact_new)
-climateact_rest%>%
-  filter(new2_pca_cluster==0)
+climateact_rest <- climateact_rest%>%
+  filter(climateact_word_selected$new2_pca_cluster==0)
 embeddings_rest <- as.matrix(climateact_rest[, embedding_cols_new])
 
 # Perform t-SNE
@@ -623,13 +628,13 @@ plot(cum_explained_variance_rest, type = "b", main="Cumulative Explained Varianc
 ```
 
 ```{r}
-# Project the data onto the first 100 principal components
+# Project the data onto the first 300 principal components
 pca_transformed_data_rest <- pca_result_rest$x[, 1:300]
 ```
 
 ```{r}
 # Apply DBSCAN on PCA reduced set
-db_result_rest <- dbscan::dbscan(pca_transformed_data_rest, eps = 15, minPts = 5)
+db_result_rest <- dbscan::dbscan(pca_transformed_data_rest, eps = 20, minPts = 3)
 
 # Count of data points in each cluster
 cluster_counts_rest <- table(db_result_rest$cluster)
@@ -645,6 +650,24 @@ cat("Number of clusters:", num_clusters_rest, "\n")
 num_noise_rest <- sum(db_result_rest$cluster == 0)
 cat("Number of noise points:", num_noise_rest, "\n")
 ```
+```{r}
+#Create dataframe to inspect rest cluster with words
+# Extract columns 2:12 from the climateact_word dataset
+climateact_word_rest <- climateact_rest[, 2:12]
+
+# Add the cluster assignments from both PCA and UMAP to the extracted dataframe
+#Climateact_word_selected$pca_cluster <- db_result$cluster
+#Climateact_word_selected$umap_cluster <- db_result_umap$cluster
+#Climateact_word_selected$new_umap_cluster <- db_result_umap_new$cluster
+#Climateact_word_selected$new_pca_cluster <- db_result_new$cluster
+climateact_word_rest$rest_cluster <- db_result_rest$cluster
+#Climateact_word_selected$new3_pca_cluster <- db_result_new3$cluster
+
+
+#Write Xl file
+write_xlsx(climateact_word_rest, "Climateact_word_rest.xlsx")
+```
+
 
 ```{r,eval=F,echo=F}
 #Dimensionality Reduction 2 Dimensions
