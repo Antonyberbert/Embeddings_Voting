@@ -76,6 +76,7 @@ head(climateact)
 head(climateact_word)
 head(climateact_new)
 ```
+
 ```{r,eval=F}
 set.seed(123)
 # 1) Regression with mean_valence_macro as the independent variable 
@@ -462,7 +463,7 @@ cat("Number of noise points:", num_noise_new4, "\n")
 
 
 
-```{r}
+```{r,eval=F,echo=F}
 #Visualize the umap reduced clusters
 col25 <- c(
   "dodgerblue2", "#E31A1C", # red
@@ -504,7 +505,7 @@ ggplot(plot_df_umap_new, aes(x = UMAP1, y = UMAP2, color = cluster)) +
   theme_minimal()
 ```
 
-```{r}
+```{r,eval=F,echo=F}
 #Visualize the PCA reduced clusters
 # Create a dataframe for plotting
 plot_data <- data.frame(pca_transformed_data, Cluster = as.factor(db_result$cluster))
@@ -543,7 +544,7 @@ ggplot(plot_data_filtered, aes(x = PC1, y = PC2, color = as.factor(Cluster))) +
   theme(legend.position = "right")
 ```
 
-```{r}
+```{r,eval=F,echo=F}
 #Plot PCA new embeddings
 # Create a dataframe for plotting
 plot_data_new <- data.frame(pca_transformed_data_new, Cluster = as.factor(db_result_new$cluster))
