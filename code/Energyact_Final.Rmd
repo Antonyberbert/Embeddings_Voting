@@ -214,10 +214,10 @@ write_xlsx(energyact_rest_clustered, "energyact_rest.xlsx")
 ```{r}
 #Repeat the procedure again
 #Create dataset of noise points to cluster them
-energyact_rest2 <- cbind(energyact_rest_clustered[,1:12],energyact_rest_clustered$rest_cluster,embeddings_rest)
+energyact_rest2 <- cbind(energyact_rest_clustered[,1:12],embeddings_rest)
 energyact_rest2 <- energyact_rest2%>%
-  filter(energyact_rest_clustered$rest_cluster==0)%>%
-  rename(cluster <- `energyact_rest_clustered$rest_cluster`)
+  filter(rest_cluster==0)%>%
+  rename(cluster = `rest_cluster`)
 embeddings_rest2 <- as.matrix(energyact_rest2[, embedding_cols])
 
 # Perform t-SNE
@@ -280,11 +280,166 @@ cat("Number of noise points:", num_noise_rest2, "\n")
 ```{r}
 #Create dataframe to inspect rest cluster with words
 # Extract columns 2:12 from the energyact dataset
-energyact_rest2_clustered <- energyact_rest2[, 2:10]
+energyact_rest2_clustered <- energyact_rest2[, 1:11]
 
 energyact_rest2_clustered$rest_cluster <- db_result_rest2$cluster
 
 
 #Write Xl file
 write_xlsx(energyact_rest2_clustered, "energyact_rest2.xlsx")
+```
+
+```{r}
+#Repeat the procedure again
+#Create dataset of noise points to cluster them
+energyact_rest3 <- cbind(energyact_rest2_clustered[,1:12],embeddings_rest2)
+energyact_rest3 <- energyact_rest3%>%
+  filter(rest_cluster==0)%>%
+  rename(cluster = `rest_cluster`)
+embeddings_rest3 <- as.matrix(energyact_rest3[, embedding_cols])
+
+# Perform t-SNE
+set.seed(123) # for reproducibility
+tsne_energyact_rest3 <- Rtsne(embeddings_rest3, is_distance = FALSE, perplexity = 30, check_duplicates = FALSE)
+
+# Plot t-SNE results
+plot_rest3 <- ggplot(NULL, aes(x = tsne_energyact_rest3$Y[, 1], y = tsne_energyact_rest3$Y[, 2])) +
+  geom_point(alpha = 0.6) +
+  labs(title = "t-SNE of rest embeddings")
+
+print(plot_rest3)
+```
+
+```{r}
+#Principal Component Analysis to reduce to important dimensions for rest embeddings
+set.seed(123)
+
+# Applying PCA
+pca_result_rest3 <- prcomp(embeddings_rest3, center = TRUE, scale. = TRUE)
+
+# Plotting the variance explained by each principal component
+explained_variance_ratio_rest3 <- pca_result_rest3$sdev^2 / sum(pca_result_rest3$sdev^2)
+cum_explained_variance_rest3 <- cumsum(explained_variance_ratio_rest3)
+plot(explained_variance_ratio_rest3, type = "b", main="Explained Variance by Principal Components",
+     xlab = "Principal Component", ylab = "Explained Variance Ratio")
+
+plot(cum_explained_variance_rest3, type = "b", main="Cumulative Explained Variance",
+     xlab = "Number of Principal Components", ylab = "Cumulative Explained Variance Ratio",
+     ylim=c(0.8,1), yaxp=c(0.8,1,4))  # Here, it's divided into 0.8, 0.85, 0.9, 0.95, 1
+
+#By inspecting the Cumulative graph, choose what number of components explain 95% of variance
+```
+
+```{r}
+# Project the data onto the first 300 principal components
+pca_rest3 <- pca_result_rest3$x[, 1:300]
+```
+
+```{r}
+# Apply DBSCAN on PCA reduced set
+set.seed(123)
+db_result_rest3 <- dbscan::dbscan(pca_rest3, eps = 27, minPts = 3)
+
+# Count of data points in each cluster
+cluster_counts_rest3 <- table(db_result_rest3$cluster)
+
+# Display the clustering results
+print(cluster_counts_rest3)
+
+# Number of clusters (excluding noise)
+num_clusters_rest3 <- length(unique(db_result_rest3$cluster)) - 1  # Subtracting 1 to exclude noise
+cat("Number of clusters:", num_clusters_rest3, "\n")
+
+# Number of noise points
+num_noise_rest3 <- sum(db_result_rest3$cluster == 0)
+cat("Number of noise points:", num_noise_rest3, "\n")
+```
+
+```{r}
+#Create dataframe to inspect rest cluster with words
+# Extract columns 2:12 from the energyact dataset
+energyact_rest3_clustered <- energyact_rest3[, 1:11]
+
+energyact_rest3_clustered$rest_cluster <- db_result_rest3$cluster
+
+
+#Write Xl file
+write_xlsx(energyact_rest3_clustered, "energyact_rest3.xlsx")
+```
+
+```{r}
+#Repeat the procedure again
+#Create dataset of noise points to cluster them
+energyact_rest4 <- cbind(energyact_rest3_clustered,embeddings_rest3)
+energyact_rest4 <- energyact_rest4%>%
+  filter(rest_cluster==0)%>%
+  rename(cluster = `rest_cluster`)
+embeddings_rest4 <- as.matrix(energyact_rest4[, embedding_cols])
+
+# Perform t-SNE
+set.seed(123) # for reproducibility
+tsne_energyact_rest4 <- Rtsne(embeddings_rest4, is_distance = FALSE, perplexity = 30, check_duplicates = FALSE)
+
+# Plot t-SNE results
+plot_rest4 <- ggplot(NULL, aes(x = tsne_energyact_rest4$Y[, 1], y = tsne_energyact_rest4$Y[, 2])) +
+  geom_point(alpha = 0.6) +
+  labs(title = "t-SNE of rest embeddings")
+
+print(plot_rest4)
+```
+
+```{r}
+#Principal Component Analysis to reduce to important dimensions for rest embeddings
+set.seed(123)
+
+# Applying PCA
+pca_result_rest4 <- prcomp(embeddings_rest4, center = TRUE, scale. = TRUE)
+
+# Plotting the variance explained by each principal component
+explained_variance_ratio_rest4 <- pca_result_rest4$sdev^2 / sum(pca_result_rest4$sdev^2)
+cum_explained_variance_rest4 <- cumsum(explained_variance_ratio_rest4)
+plot(explained_variance_ratio_rest4, type = "b", main="Explained Variance by Principal Components",
+     xlab = "Principal Component", ylab = "Explained Variance Ratio")
+
+plot(cum_explained_variance_rest4, type = "b", main="Cumulative Explained Variance",
+     xlab = "Number of Principal Components", ylab = "Cumulative Explained Variance Ratio",
+     ylim=c(0.8,1), yaxp=c(0.8,1,4))  # Here, it's divided into 0.8, 0.85, 0.9, 0.95, 1
+
+#By inspecting the Cumulative graph, choose what number of components explain 95% of variance
+```
+
+```{r}
+# Project the data onto the first 300 principal components
+pca_rest4 <- pca_result_rest4$x[, 1:300]
+```
+
+```{r}
+# Apply DBSCAN on PCA reduced set
+set.seed(123)
+db_result_rest4 <- dbscan::dbscan(pca_rest4, eps = 28, minPts = 3)
+
+# Count of data points in each cluster
+cluster_counts_rest4 <- table(db_result_rest4$cluster)
+
+# Display the clustering results
+print(cluster_counts_rest4)
+
+# Number of clusters (excluding noise)
+num_clusters_rest4 <- length(unique(db_result_rest4$cluster)) - 1  # Subtracting 1 to exclude noise
+cat("Number of clusters:", num_clusters_rest4, "\n")
+
+# Number of noise points
+num_noise_rest4 <- sum(db_result_rest4$cluster == 0)
+cat("Number of noise points:", num_noise_rest4, "\n")
+```
+```{r}
+#Create dataframe to inspect rest cluster with words
+# Extract columns 2:12 from the energyact dataset
+energyact_rest4_clustered <- energyact_rest4[, 1:11]
+
+energyact_rest4_clustered$rest_cluster <- db_result_rest4$cluster
+
+
+#Write Xl file
+write_xlsx(energyact_rest4_clustered, "energyact_rest4.xlsx")
 ```
