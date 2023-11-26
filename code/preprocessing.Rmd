@@ -1,0 +1,131 @@
+---
+title: "Preprocessing"
+output: html_document
+date: "2023-11-26"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#Install and load necessary packages
+packages <- c("devtools","here","dplyr","tidyverse","readxl","writexl","hunspell")
+for (package in packages) {
+  if (!requireNamespace(package, quietly = TRUE)) {
+    install.packages(package)
+  }
+}
+lapply(packages,library, character.only=T)
+```
+
+```{r}
+structure <- read.csv(here::here("data","energyact_1.csv"))
+additional_data <- read.csv(here::here("data","all_surveys.csv"))
+structure <- rename(structure, participantID = personID)
+
+energyact <- left_join(structure, 
+                        select(additional_data, participantID, intendedVote, ratingLaw, mean_valence_macro), 
+                        by = c("participantID"))
+```
+
+```{r}
+check_spelling <- function(word, dict) {
+    # Check the word in its original form and in lowercase
+    original_check <- hunspell::hunspell_check(word, dict = dict)
+    lowercase_check <- hunspell::hunspell_check(tolower(word), dict = dict)
+
+    # If either is true, return true
+    return(original_check | lowercase_check)
+}
+
+#remove "klimagesetz" rows
+energyact <- energyact %>% filter(!word %in% c("klimagesetz", "Klimagesetz"))
+
+#Set dictionary to German
+dict <- hunspell::dictionary(here::here("hunspell","index.dic"))
+
+# Apply this function to your words
+spelling_results <- sapply(energyact$word, check_spelling, dict = dict)
+
+# Extract misspelled words (Spell-check using hunspell did not really work, so check misspelled words manually)
+misspelled_words <- energyact$word[!spelling_results]
+
+# Create a dataframe with misspelled words and an empty column for corrections
+misspelled_df <- data.frame(misspelled_words = misspelled_words, correction = NA)
+
+write_xlsx(misspelled_df, here::here("data","correction_word.xlsx"))
+```
+
+```{r}
+#Import corrected file
+correction_word <- read_xlsx(here::here("data","correction_word.xlsx"))
+
+# Loop over each row in the corrected_misspellings dataframe
+for (i in 1:nrow(correction_word)) {
+    original_word <- correction_word$misspelled_words[i]
+    correction <- correction_word$correction[i]
+
+    if (!is.na(correction) && correction != "") {
+        # Replace the original word with the correction in energyact$word
+        energyact$word[energyact$word == original_word] <- correction
+    }
+}
+```
+
+```{r}
+#Lowercase everything
+energyact$word <- tolower(energyact$word)
+
+#remove "klimagesetz" rows
+energyact <- energyact %>% filter(word != "klimagesetz")
+
+#replace certain words from wordlist in excel manually
+last_check <- data.frame(word = energyact$word, wordID = energyact$wordID)
+
+# Write this new dataframe to an Excel file
+write_xlsx(last_check,here::here("data","last_check.xlsx"))
+
+#import excel file
+last_corr <- read_xlsx(here::here("data","last_check.xlsx"))
+```
+
+```{r}
+#replace original columns in energyact by matching wordID
+energyact <- energyact %>%
+    left_join(last_corr, by = "wordID", suffix = c("", ".last_corr")) %>%
+    mutate(word = coalesce(word.last_corr, word)) %>%
+    select(-word.last_corr)
+
+#save new xl file
+write_xlsx(energyact,here::here("data","energyact_final.xlsx"))
+```
+
+```{r}
+#replace e-auto with elektroauto and ẞ with ss 
+#read in final dataset
+energyact_fin <- read_xlsx(here::here("data","energyact_final.xlsx"))
+
+#replace certain words from wordlist in excel manually
+last_check2 <- data.frame(word = energyact_fin$word, wordID = energyact_fin$wordID)
+
+# Write this new dataframe to an Excel file
+write_xlsx(last_check2,here::here("data","last_check2.xlsx"))
+
+#import excel file
+last_corr2 <- read_xlsx(here::here("data","last_check2.xlsx"))
+
+#replace original columns in energyact by matching wordID
+energyact_fin <- energyact_fin %>%
+    left_join(last_corr2, by = "wordID", suffix = c("", ".last_corr")) %>%
+    mutate(word = coalesce(word.last_corr, word)) %>%
+    select(-word.last_corr)
+
+#remove rows containing "remove" in word column
+energyact_fin <- energyact_fin %>% filter(word != "remove")
+
+#save new xl file
+write_xlsx(energyact_fin,here::here("data","energyact_final.xlsx"))
+```
+
+
