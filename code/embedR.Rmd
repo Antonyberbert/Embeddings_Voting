@@ -30,17 +30,18 @@ library("embedR")
 ```
 
 ```{r}
+set.seed(123)
 #read in final dataset
 energyact_fin <- read_xlsx(here::here("data","energyact_final.xlsx"))
 
 #set api tokens
-embedR::er_set_tokens("cohere" = "x","huggingface"="x","openai" = "x")
+#embedR::er_set_tokens("cohere" = "x","huggingface"="x","openai" = "x")
 
-embedding = energyact_fin$word%>%
-  er_embed(api="cohere",model="embed-multilingual-v3.0")
+#embedding = energyact_fin$word%>%
+  #er_embed(api="cohere",model="embed-multilingual-v3.0")
 
 #save embeddings as R object
-saveRDS(embedding, here::here("data","embedding.rds"))
+#saveRDS(embedding, here::here("data","embedding.rds"))
 
 #load embeddings as R object
 embedding <- readRDS(here::here("data","embedding.rds"))
@@ -50,7 +51,8 @@ result <- readRDS(here::here("data","result_emb.rds"))
 ```
 
 ```{r}
-result = embedding %>%
+set.seed(26)
+result_fin = embedding %>%
 
   # group similar texts
   er_group(method = "fuzzy",threshold = 0.9) %>%
@@ -59,26 +61,27 @@ result = embedding %>%
   er_project(method = "umap") %>%
 
   # cluster projection
-  er_cluster(method = "louvain",resolution = 1.56) %>%
+  er_cluster(method = "louvain",resolution = 1.50) %>%
 
   # produce data frame
   er_frame()
 
 #save result as rds
-saveRDS(result,here::here("data","result_emb.rds"))
+saveRDS(result_fin,here::here("data","resultfin_emb.rds"))
 ```
 
 ```{r}
+set.seed(26)
 result2 = embedding %>%
 
   # group similar texts
-  er_group(method = "fuzzy",threshold = 0.85) %>%
+  er_group(method = "fuzzy",threshold = 0.65) %>%
 
   # generate 2D projection
   er_project(method = "umap") %>%
 
   # cluster projection
-  er_cluster(method = "louvain",resolution = 1.70) %>%
+  er_cluster(method = "louvain",resolution = 1.7) %>%
 
   # produce data frame
   er_frame()
@@ -109,8 +112,8 @@ result2%>%
 ```
 
 ```{r}
-result$group_texts <- sapply(result$group_texts, toString)
-write_xlsx(result, here::here("data","embedR_res.xlsx"))
+result_fin$group_texts <- sapply(result_fin$group_texts, toString)
+write_xlsx(result_fin, here::here("data","embedR_resfin.xlsx"))
 #cluster 1 economy
 #cluster 13 environmental protection
 ```
