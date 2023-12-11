@@ -35,7 +35,7 @@ set.seed(26)
 energyact_fin <- read_xlsx(here::here("data","energyact_final.xlsx"))
 
 #set api tokens
-embedR::er_set_tokens("cohere" = "Snf1BGQYiAqyfdCSW8UawiepcZiDLqmriSR2aKN4","huggingface"="x","openai" = "x")
+embedR::er_set_tokens("cohere" = "x","huggingface"="x","openai" = "x")
 
 embedding = energyact_fin$word%>%
   er_embed(api="cohere",model="embed-multilingual-v3.0")

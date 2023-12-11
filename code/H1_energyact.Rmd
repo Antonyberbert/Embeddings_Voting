@@ -86,7 +86,11 @@ sum_group_size_H1_3 <- sum(H1_df$group_size[H1_df$H1 == 3], na.rm = TRUE)
 cat("Sum of group_size for H1 = 1:", sum_group_size_H1_1, "\n")
 cat("Sum of group_size for H1 = 2:", sum_group_size_H1_2, "\n")
 cat("Sum of group_size for H1 = 3:", sum_group_size_H1_3, "\n")
+
+#Lastly delete rows where H1 == 4
+energyact_fin_updated <- energyact_fin_updated[energyact_fin_updated$H1 != 4, ]
 ```
+
 ```{r}
 #How many people that mentioned economy words (H1=1) voted for (1) or against (0) the law
 # Filter rows where H1 = 1 (Economy words)
@@ -116,15 +120,22 @@ env_prot_vote_perc <- prop.table(env_prot_vote_table) * 100
 print("Table for Environmental Protection Words (H1 = 2) and Voting:")
 print(env_prot_vote_perc)
 ```
+
 ```{r}
-# Subset for 'for' and 'against' voters, excluding H1 == 3 and H1 == 4
-for_voters <- subset(energyact_fin_updated, intendedVote == 1 & !(H1 %in% c(3, 4)))
-against_voters <- subset(energyact_fin_updated, intendedVote == 0 & !(H1 %in% c(3, 4)))
+#Create H1 Factor variable
+#first recode H1
+energyact_fin_updated$fH1 <- energyact_fin_updated$H1 - 1
+# Convert to factor
+energyact_fin_updated$fH1 <- factor(energyact_fin_updated$fH1, levels = c(0,1,2), labels= c("economy","environmental protection","other"))
+
+# Subset for 'for' and 'against' voters, excluding H1 == 2
+for_voters <- subset(energyact_fin_updated, intendedVote == 1 & H1 !=2)
+against_voters <- subset(energyact_fin_updated, intendedVote == 0 & H1 != 2)
 
 # Calculate percentages for economy words among 'for' and 'against' voters
-economy_words_for <- sum(for_voters$H1 == 1)
+economy_words_for <- sum(for_voters$H1 == 0)
 percentage_economy_for <- economy_words_for / nrow(for_voters) * 100
-
+y<
 economy_words_against <- sum(against_voters$H1 == 1)
 percentage_economy_against <- economy_words_against / nrow(against_voters) * 100
 
