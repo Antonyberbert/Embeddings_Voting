@@ -52,6 +52,7 @@ saveRDS(embedding, here::here("data","embedding.rds"))
 
 ```{r}
 set.seed(26)
+
 result_fin = embedding %>%
 
   # group similar texts
@@ -67,7 +68,7 @@ result_fin = embedding %>%
   er_frame()
 
 #save result as rds
-saveRDS(result_fin,here::here("data","resultfin_emb.rds"))
+#saveRDS(result_fin,here::here("data","resultfin_emb.rds"))
 ```
 
 ```{r,echo=F,eval=F}
@@ -87,7 +88,7 @@ result2 = embedding %>%
   er_frame()
 
 #save result as rds
-saveRDS(result2,here::here("data","result_emb2.rds"))
+#saveRDS(result2,here::here("data","result_emb2.rds"))
 ```
 
 

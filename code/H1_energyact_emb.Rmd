@@ -1,0 +1,313 @@
+---
+title: "H1_energyact emb"
+output:
+  pdf_document: default
+  html_document: default
+date: "2023-12-18"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#Install and load necessary packages
+packages <- c("devtools","here","dplyr","tidyverse","readxl","writexl","hunspell")
+for (package in packages) {
+  if (!requireNamespace(package, quietly = TRUE)) {
+    install.packages(package)
+  }
+}
+lapply(packages,library, character.only=T)
+```
+
+```{r}
+#Install and load embedR
+if (!requireNamespace("embedR", quietly = TRUE)) {
+    # If not installed, install it using devtools
+    devtools::install_github("dwulff/embedR")
+}
+
+library("embedR")
+```
+
+```{r}
+#read in final dataset
+energyact_fin <- read_xlsx(here::here("data","energyact_final.xlsx"))
+
+#load embeddings as R object
+embedding <- readRDS(here::here("data","embedding.rds"))
+```
+
+```{r,eval=F,echo=F}
+#embed chatGPT list
+#economy words
+#embedR::er_set_tokens("cohere" = "x","huggingface"="x","openai" = "x")
+
+#embedding_econ = er_embed(c("kosten","teuer","preis","arbeit","investition","wirtschaft","markt","gewinn","umsatz","wachstum","rendite","kapital","handel","unternehmen","beschäftigung","einkommen","produktion","finanzen","budget","wettbewerb","konjunktur","nachfrage","angebot","steuern","subvention","rentabel","liquidität","kredit","verschuldung","günstig"),api="cohere",model="embed-multilingual-v3.0")
+
+#environmental prot words
+#embedding_env = er_embed(c("umweltschutz","klimaschutz","landschaftsschutz","naturschutz","wasserschutz","artenschutz","dringend","notwendig","kritisch","sofort","unverzüglich","tierschutz","zeitdruck","zeit"),api="cohere",model="embed-multilingual-v3.0")
+```
+
+```{r,eval=F, echo=F}
+#save embeddings as R object
+saveRDS(embedding_econ, here::here("data","embedding_econ.rds"))
+
+saveRDS(embedding_env, here::here("data","embedding_env.rds"))
+
+```
+
+
+```{r}
+#Install and load text2vec
+if (!requireNamespace("text2vec", quietly = TRUE)) {
+    # If not installed, install it using devtools
+    install.packages("text2vec")
+}
+
+library("text2vec")
+```
+
+```{r}
+calculate_max_similarity <- function(embedding_study, embedding_list) {
+  # Calculate cosine similarity
+  similarity_matrix <- sim2(embedding_study, embedding_list, method = "cosine")
+  # Get the maximum similarity score for each word
+  max_similarity <- apply(similarity_matrix, 1, max)
+  return(max_similarity)
+}
+```
+
+```{r}
+#Load embeddings
+embedding_econ <- readRDS(here::here("data","embedding_econ.rds"))
+
+embedding_env <- readRDS(here::here("data","embedding_env.rds"))
+# Creating a dataframe from the study embedding matrix
+H1_df <- as.data.frame(embedding)
+rownames(H1_df) <- colnames(embedding)  # Assuming rownames are the words
+
+# Calculate max similarities
+H1_df$max_similarity_econ <- calculate_max_similarity(embedding, embedding_econ)
+H1_df$max_similarity_env <- calculate_max_similarity(embedding, embedding_env)
+```
+
+```{r}
+# Set the threshold; use different thresholds
+threshold <- 0.65
+
+# Categorization logic
+H1_df$category <- ifelse(H1_df$max_similarity_econ >= threshold & H1_df$max_similarity_econ > H1_df$max_similarity_env, "economy",
+                         ifelse(H1_df$max_similarity_env >= threshold, "environmental protection", "other"))
+```
+
+```{r}
+# Set the second threshold
+threshold2 <- 0.75
+
+# Categorization logic
+H1_df$category2 <- ifelse(H1_df$max_similarity_econ >= threshold & H1_df$max_similarity_econ > H1_df$max_similarity_env, "economy",
+                         ifelse(H1_df$max_similarity_env >= threshold2, "environmental protection", "other"))
+```
+
+```{r}
+# Set the second threshold
+threshold3 <- 0.8
+
+# Categorization logic
+H1_df$category3 <- ifelse(H1_df$max_similarity_econ >= threshold & H1_df$max_similarity_econ > H1_df$max_similarity_env, "economy",
+                         ifelse(H1_df$max_similarity_env >= threshold3, "environmental protection", "other"))
+```
+
+```{r}
+#Add the new columns to the energyact_fin df. Make sure, that the rows are in the same order
+if (nrow(H1_df) == nrow(energyact_fin)) {
+  # The dataframes have the same number of rows
+} else {
+  # The dataframes have a different number of rows
+  stop("The number of rows in H1_df and energyact_fin does not match.")
+}
+
+last_five_columns <- names(H1_df)[(ncol(H1_df)-4):ncol(H1_df)]
+energyact_fin[last_five_columns] <- H1_df[last_five_columns]
+```
+
+```{r}
+#Manually categorize 20 rows to check validity of embedding categorization
+set.seed(26)  # Setting a seed for reproducibility
+sampled_rows <- sample_n(energyact_fin, 50)
+
+# View the sampled rows
+print(sampled_rows$word)
+
+sampled_rows$manual_cat <- c("other","other","other","other","other","economy","economy","other","other","other","economy","other","other","other","other","other","other","other","other","other","other","other","other","other","other","other","other","other","other","other","economy","other","other","other","other","other","economy","other","other","other","other","other","environmental protection","other","other","other","other","other","other","other")
+```
+
+```{r}
+# Comparison
+correct_matches065 <- sum(sampled_rows$category == sampled_rows$manual_cat)
+
+correct_matches075 <- sum(sampled_rows$category2 == sampled_rows$manual_cat)
+
+correct_matches080 <- sum(sampled_rows$category3 == sampled_rows$manual_cat)
+
+# Calculate the ratio
+match_ratio065 <- correct_matches065 / nrow(sampled_rows)
+
+match_ratio075 <- correct_matches075 / nrow(sampled_rows)
+
+match_ratio080 <- correct_matches080 / nrow(sampled_rows)
+
+# Print the ratio
+print(match_ratio065)
+print(match_ratio075)
+print(match_ratio080)
+```
+
+```{r}
+# Subset to find rows where categorizations do not match
+non_matching_rows065 <- sampled_rows[sampled_rows$category != sampled_rows$manual_cat, ]
+non_matching_rows075 <- sampled_rows[sampled_rows$category2 != sampled_rows$manual_cat, ]
+non_matching_rows080 <- sampled_rows[sampled_rows$category3 != sampled_rows$manual_cat, ]
+
+
+# Print the non-matching rows
+print(non_matching_rows065[, c("word", "category", "manual_cat")])
+print(non_matching_rows075[, c("word", "category2", "manual_cat")])
+print(non_matching_rows080[, c("word", "category3", "manual_cat")])
+```
+
+```{r}
+#How many people that mentioned economy words (H1=1) voted for (1) or against (0) the law
+# Filter rows where H1 = 1 (Economy words)
+economy_words <- subset(energyact_fin, category3 == "economy")
+
+# Create a contingency table for economy words vs intended vote
+economy_vote_table <- table(economy_words$intendedVote)
+
+#Create percentages table as absolute numbers are different
+economy_vote_perc <- prop.table(economy_vote_table) * 100
+
+# Print the table
+print("Percentage Table for Economy Words (category3 = economy) and Voting:")
+print(economy_vote_perc)
+
+#How many people that mentioned environmental protection words (H1=2) voted for (1) or against (0) the law
+
+# Filter rows where H1 = 2 (Environmental protection words)
+env_prot_words <- subset(energyact_fin, category3 == "environmental protection")
+
+# Create a contingency table for environmental protection words vs intended vote
+env_prot_vote_table <- table(env_prot_words$intendedVote)
+
+#Create percentages table as absolute numbers are different
+env_prot_vote_perc <- prop.table(env_prot_vote_table) * 100
+# Print the table
+print("Table for Environmental Protection Words (category3 = environmental protection) and Voting:")
+print(env_prot_vote_perc)
+```
+```{r}
+#Create category3 Factor variable
+# Convert to factor
+energyact_fin$fcategory3 <- factor(energyact_fin$category3, levels= c("economy","environmental protection","other"))
+
+# Subset for 'for' voters, including only fH1 == 0 and fH1 == 1
+for_voters <- subset(energyact_fin, intendedVote == 1 & fcategory3 %in% c("economy","environmental protection"))
+
+# Subset for 'against' voters, including only fH1 == 0 and fH1 == 1
+against_voters <- subset(energyact_fin, intendedVote == 0 & fcategory3 %in% c("economy","environmental protection"))
+
+# Calculate percentages for economy words among 'for' and 'against' voters
+economy_words_for <- sum(for_voters$fcategory3 == "economy")
+percentage_economy_for <- economy_words_for / nrow(for_voters) * 100
+economy_words_against <- sum(against_voters$fcategory3 == "economy")
+percentage_economy_against <- economy_words_against / nrow(against_voters) * 100
+
+# Print the results
+cat("Percentage of voters 'for' mentioning economy words:", percentage_economy_for, "%\n")
+cat("Percentage of voters 'against' mentioning economy words:", percentage_economy_against, "%\n")
+```
+
+```{r}
+# Calculate percentages for environmental protection words among 'for' and 'against' voters
+env_protection_words_for <- sum(for_voters$fcategory3 == "environmental protection")
+percentage_env_protection_for <- env_protection_words_for / nrow(for_voters) * 100
+
+env_protection_words_against <- sum(against_voters$fcategory3 == "environmental protection")
+percentage_env_protection_against <- env_protection_words_against / nrow(against_voters) * 100
+
+# Print the results
+cat("Percentage of voters 'for' mentioning environmental protection words:", percentage_env_protection_for, "%\n")
+cat("Percentage of voters 'against' mentioning environmental protection words:", percentage_env_protection_against, "%\n")
+```
+
+```{r}
+#Logistic regression
+# Exclude fcategory3 = other
+filtered_data <- subset(energyact_fin, fcategory3 != "other")
+
+# Create binary variables for economy and environmental protection words
+filtered_data$economy_mentioned <- as.numeric(filtered_data$fcategory3 == "economy")
+filtered_data$env_prot_mentioned <- as.numeric(filtered_data$fcategory3 == "environmental protection")
+
+# Logistic regression for economy words
+logit_model_economy <- glm(intendedVote ~ economy_mentioned, family = "binomial", data = filtered_data)
+summary(logit_model_economy)
+
+#Odds Ratio
+odds_ratio_economy <- exp(logit_model_economy$coefficients["economy_mentioned"])
+print("Odds Ratio for economy_mentioned:")
+print(odds_ratio_economy)
+
+# Logistic regression for environmental protection words
+logit_model_env_prot <- glm(intendedVote ~ env_prot_mentioned, family = "binomial", data = filtered_data)
+summary(logit_model_env_prot)
+
+#Odds Ratio
+odds_ratio_env <- exp(logit_model_env_prot$coefficients["env_prot_mentioned"])
+print("Odds Ratio for env_prot_mentioned:")
+print(odds_ratio_env)
+```
+
+```{r}
+#Bonferroni correction for multiple testing
+# Extract p-values
+p_value_economy <- summary(logit_model_economy)$coefficients["economy_mentioned", "Pr(>|z|)"]
+p_value_env_prot <- summary(logit_model_env_prot)$coefficients["env_prot_mentioned", "Pr(>|z|)"]
+
+# Combine p-values into a vector
+p_values <- c(economy = p_value_economy, env_prot = p_value_env_prot)
+
+# Bonferroni correction
+p_adjusted_bonferroni <- p.adjust(p_values, method = "bonferroni")
+
+# Holm correction (another common method)
+p_adjusted_holm <- p.adjust(p_values, method = "holm")
+
+# Printing adjusted p-values
+print("Adjusted P-Values (Bonferroni):")
+print(p_adjusted_bonferroni)
+
+print("Adjusted P-Values (Holm):")
+print(p_adjusted_holm)
+```
+
+```{r}
+#Calculating model fit (McFadden's R-squared)
+calculate_mcfadden_r_squared <- function(model) {
+  ll_full <- logLik(model)  # Log-likelihood of the full model
+  ll_null <- logLik(glm(formula = intendedVote ~ 1, family = "binomial", data = model$data))  # Log-likelihood of the null model
+  1 - as.numeric(ll_full / ll_null)
+}
+
+# McFadden’s R-squared for the economy model
+r_squared_economy <- calculate_mcfadden_r_squared(logit_model_economy)
+print("McFadden's R-squared for the Economy Model:")
+print(r_squared_economy)
+
+# McFadden’s R-squared for the environmental protection model
+r_squared_env_prot <- calculate_mcfadden_r_squared(logit_model_env_prot)
+print("McFadden's R-squared for the Environmental Protection Model:")
+print(r_squared_env_prot)
+```
