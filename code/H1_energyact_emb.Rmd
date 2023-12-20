@@ -12,7 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 #Install and load necessary packages
-packages <- c("devtools","here","dplyr","tidyverse","readxl","writexl","hunspell")
+packages <- c("devtools","here","dplyr","tidyverse","readxl","writexl","hunspell","text2vec")
 for (package in packages) {
   if (!requireNamespace(package, quietly = TRUE)) {
     install.packages(package)
@@ -39,34 +39,23 @@ energyact_fin <- read_xlsx(here::here("data","energyact_final.xlsx"))
 embedding <- readRDS(here::here("data","embedding.rds"))
 ```
 
-```{r,eval=F,echo=F}
+```{r,eval=F, echo=F}
 #embed chatGPT list
 #economy words
 #embedR::er_set_tokens("cohere" = "x","huggingface"="x","openai" = "x")
 
-#embedding_econ = er_embed(c("kosten","teuer","preis","arbeit","investition","wirtschaft","markt","gewinn","umsatz","wachstum","rendite","kapital","handel","unternehmen","beschäftigung","einkommen","produktion","finanzen","budget","wettbewerb","konjunktur","nachfrage","angebot","steuern","subvention","rentabel","liquidität","kredit","verschuldung","günstig"),api="cohere",model="embed-multilingual-v3.0")
+#embedding_econ = er_embed(c("kosten","teuer","preis","arbeit","investition","wirtschaft","finanzierung","budget","ausgaben","steuern","subvention","gewinn","verlust","rendite","sparen","wettbewerb","verschuldung","einkommen","umsatz","markt"),api="cohere",model="embed-multilingual-v3.0")
 
 #environmental prot words
-#embedding_env = er_embed(c("umweltschutz","klimaschutz","landschaftsschutz","naturschutz","wasserschutz","artenschutz","dringend","notwendig","kritisch","sofort","unverzüglich","tierschutz","zeitdruck","zeit"),api="cohere",model="embed-multilingual-v3.0")
+#embedding_env = er_embed(c("umweltschutz","klimaschutz","dringend","notwendig","nachhaltigkeit","erneuerbar","ökologie","biodiversität","artenschutz","ressourcenschonung","emission","klimawandel","ökosystem","umweltbewusstsein","grüne energie","verschmutzung","zeitdruck","landschaftsschutz","naturschutz","tierschutz"),api="cohere",model="embed-multilingual-v3.0")
 ```
 
 ```{r,eval=F, echo=F}
 #save embeddings as R object
-saveRDS(embedding_econ, here::here("data","embedding_econ.rds"))
+#saveRDS(embedding_econ, here::here("data","embedding_econ.rds"))
 
-saveRDS(embedding_env, here::here("data","embedding_env.rds"))
+#saveRDS(embedding_env, here::here("data","embedding_env.rds"))
 
-```
-
-
-```{r}
-#Install and load text2vec
-if (!requireNamespace("text2vec", quietly = TRUE)) {
-    # If not installed, install it using devtools
-    install.packages("text2vec")
-}
-
-library("text2vec")
 ```
 
 ```{r}
@@ -86,7 +75,14 @@ embedding_econ <- readRDS(here::here("data","embedding_econ.rds"))
 embedding_env <- readRDS(here::here("data","embedding_env.rds"))
 # Creating a dataframe from the study embedding matrix
 H1_df <- as.data.frame(embedding)
-rownames(H1_df) <- colnames(embedding)  # Assuming rownames are the words
+
+# Save the rownames as the first column in H1_df
+H1_df$word <- rownames(H1_df)
+
+# Reset the rownames of H1_df
+rownames(H1_df) <- NULL
+
+
 
 # Calculate max similarities
 H1_df$max_similarity_econ <- calculate_max_similarity(embedding, embedding_econ)
@@ -94,220 +90,260 @@ H1_df$max_similarity_env <- calculate_max_similarity(embedding, embedding_env)
 ```
 
 ```{r}
-# Set the threshold; use different thresholds
-threshold <- 0.65
+#add similarity columns to energyact_fin
+# Get the names of the last two columns
+last_two_columns <- names(H1_df)[(ncol(H1_df)-1):ncol(H1_df)]
 
-# Categorization logic
-H1_df$category <- ifelse(H1_df$max_similarity_econ >= threshold & H1_df$max_similarity_econ > H1_df$max_similarity_env, "economy",
-                         ifelse(H1_df$max_similarity_env >= threshold, "environmental protection", "other"))
+# Add the last two columns from H1_df to energyact_fin
+energyact_fin[last_two_columns] <- H1_df[last_two_columns]
 ```
 
 ```{r}
-# Set the second threshold
-threshold2 <- 0.75
+#Visualize similarity distribution to extract threshold, first for economy words
+#First create ordered df
+energyact_fin_ordered_econ <- energyact_fin[order(-energyact_fin$max_similarity_econ), ]
 
-# Categorization logic
-H1_df$category2 <- ifelse(H1_df$max_similarity_econ >= threshold & H1_df$max_similarity_econ > H1_df$max_similarity_env, "economy",
-                         ifelse(H1_df$max_similarity_env >= threshold2, "environmental protection", "other"))
+#Calculate median similarity
+median_similarity_econ <- median(energyact_fin_ordered_econ$max_similarity_econ, na.rm = TRUE)
+
+# Create the plot
+plot_sim_econ <- ggplot(energyact_fin_ordered_econ, aes(x = reorder(row.names(energyact_fin_ordered_econ), -max_similarity_econ), y = max_similarity_econ)) +
+  geom_hline(yintercept = median_similarity_econ, linetype = "dashed", color = "blue") +
+  geom_point() +
+  #theme(axis.text.x = element_blank()) +  # Hide x-axis text for legibility
+  labs(x = "Words", y = "Max Similarity to Economy", title = "Similarity Scores for Economy Category") +
+  scale_y_continuous(breaks = seq(0, 1, by = 0.05)) +  # Set y-axis breaks
+  theme_classic()
+
+#threshold 0.75
 ```
 
 ```{r}
-# Set the second threshold
-threshold3 <- 0.8
+# Create ordered dataframe based on max_similarity_env
+energyact_fin_ordered_env <- energyact_fin[order(-energyact_fin$max_similarity_env), ]
 
-# Categorization logic
-H1_df$category3 <- ifelse(H1_df$max_similarity_econ >= threshold & H1_df$max_similarity_econ > H1_df$max_similarity_env, "economy",
-                         ifelse(H1_df$max_similarity_env >= threshold3, "environmental protection", "other"))
+# Calculate median similarity for environmental protection
+median_similarity_env <- median(energyact_fin_ordered_env$max_similarity_env, na.rm = TRUE)
+
+# Create the plot for environmental protection similarity
+plot_sim_env <- ggplot(energyact_fin_ordered_env, aes(x = reorder(row.names(energyact_fin_ordered_env), -max_similarity_env), y = max_similarity_env)) +
+  geom_hline(yintercept = median_similarity_env, linetype = "dashed", color = "blue") +
+  geom_point() +
+  # theme(axis.text.x = element_blank()) +  # Optionally hide x-axis text for legibility
+  labs(x = "Words", y = "Max Similarity to Environmental Protection", title = "Similarity Scores for Environmental Protection Category") +
+  scale_y_continuous(breaks = seq(0, 1, by = 0.05)) +  # Set y-axis breaks
+  theme_classic()
+
+#threshold ~0.82
 ```
 
 ```{r}
-#Add the new columns to the energyact_fin df. Make sure, that the rows are in the same order
-if (nrow(H1_df) == nrow(energyact_fin)) {
-  # The dataframes have the same number of rows
-} else {
-  # The dataframes have a different number of rows
-  stop("The number of rows in H1_df and energyact_fin does not match.")
-}
+#Plot both similarity scores onto one graph facetted by intendedVote along with medians
+energyact_fin_long <- energyact_fin %>%
+  pivot_longer(cols = c(max_similarity_econ, max_similarity_env),
+               names_to = "category",
+               values_to = "similarity")
 
-last_five_columns <- names(H1_df)[(ncol(H1_df)-4):ncol(H1_df)]
-energyact_fin[last_five_columns] <- H1_df[last_five_columns]
+# Median for whole dataset
+median_econ_all <- median(energyact_fin$max_similarity_econ, na.rm = TRUE)
+median_env_all <- median(energyact_fin$max_similarity_env, na.rm = TRUE)
+
+# Median for intendedVote = 0
+median_econ_0 <- median(energyact_fin$max_similarity_econ[energyact_fin$intendedVote == 0], na.rm = TRUE)
+median_env_0 <- median(energyact_fin$max_similarity_env[energyact_fin$intendedVote == 0], na.rm = TRUE)
+
+# Median for intendedVote = 1
+median_econ_1 <- median(energyact_fin$max_similarity_econ[energyact_fin$intendedVote == 1], na.rm = TRUE)
+median_env_1 <- median(energyact_fin$max_similarity_env[energyact_fin$intendedVote == 1], na.rm = TRUE)
+
+#create median df for label in plot
+medians_df <- data.frame(
+  category = c("max_similarity_econ", "max_similarity_econ", "max_similarity_econ", "max_similarity_env", "max_similarity_env", "max_similarity_env"),
+  intendedVote = c("All", "0", "1", "All", "0", "1"),
+  median = c(median_econ_all, median_econ_0, median_econ_1, median_env_all, median_env_0, median_env_1),
+  label_y = c(median_econ_all, median_econ_0, median_econ_1, median_env_all, median_env_0, median_env_1) + 0.02  # Adjust label position
+)
+
+
+plot_H1_median <- ggplot(energyact_fin_long, aes(x = reorder(word, -similarity), y = similarity, color = category)) +
+  geom_point() +
+  geom_hline(yintercept = median_econ_all, color = "blue", linetype = "dashed") +
+  geom_hline(yintercept = median_env_all, color = "green", linetype = "dashed") +
+  geom_hline(yintercept = median_econ_0, data = subset(energyact_fin_long, intendedVote == 0), color = "blue", linetype = "dotted") +
+  geom_hline(yintercept = median_econ_1, data = subset(energyact_fin_long, intendedVote == 1), color = "blue", linetype = "dotdash") +
+  geom_hline(yintercept = median_env_0, data = subset(energyact_fin_long, intendedVote == 0), color = "green", linetype = "dotted") +
+  geom_hline(yintercept = median_env_1, data = subset(energyact_fin_long, intendedVote == 1), color = "green", linetype = "dotdash") +
+  annotate("text", x = Inf, y = 1, hjust = 1.1, vjust = 1, 
+           label = paste("Median Econ All:", round(median_econ_all, 2), "\n",
+                         "Median Env All:", round(median_env_all, 2), "\n",
+                         "Median Econ 0:", round(median_econ_0, 2), "\n",
+                         "Median Econ 1:", round(median_econ_1, 2), "\n",
+                         "Median Env 0:", round(median_env_0, 2), "\n",
+                         "Median Env 1:", round(median_env_1, 2)), 
+           color = "black", size = 3) +
+  scale_color_manual(values = c("max_similarity_econ" = "blue", "max_similarity_env" = "green")) +
+  facet_wrap(~ intendedVote) +
+  theme_minimal() +
+  theme(axis.text.x = element_blank()) +
+  labs(x = "Words", y = "Max Similarity", title = "Similarity Scores for Economy and Environmental Protection Categories") +
+  scale_y_continuous(breaks = seq(0, 1, by = 0.05))  # Set y-axis breaks
 ```
 
 ```{r}
-#Manually categorize 20 rows to check validity of embedding categorization
-set.seed(26)  # Setting a seed for reproducibility
+#Plot both similarity scores onto one graph facetted by intendedVote along with means
+# Mean for the whole dataset
+mean_econ_all <- mean(energyact_fin$max_similarity_econ, na.rm = TRUE)
+mean_env_all <- mean(energyact_fin$max_similarity_env, na.rm = TRUE)
+
+# Mean for intendedVote = 0
+mean_econ_0 <- mean(energyact_fin$max_similarity_econ[energyact_fin$intendedVote == 0], na.rm = TRUE)
+mean_env_0 <- mean(energyact_fin$max_similarity_env[energyact_fin$intendedVote == 0], na.rm = TRUE)
+
+# Mean for intendedVote = 1
+mean_econ_1 <- mean(energyact_fin$max_similarity_econ[energyact_fin$intendedVote == 1], na.rm = TRUE)
+mean_env_1 <- mean(energyact_fin$max_similarity_env[energyact_fin$intendedVote == 1], na.rm = TRUE)
+
+plot_H1_mean <- ggplot(energyact_fin_long, aes(x = reorder(word, -similarity), y = similarity, color = category)) +
+  geom_point() +
+  geom_hline(yintercept = mean_econ_all, color = "blue", linetype = "dashed") +
+  geom_hline(yintercept = mean_env_all, color = "green", linetype = "dashed") +
+  geom_hline(yintercept = mean_econ_0, data = subset(energyact_fin_long, intendedVote == 0), color = "blue", linetype = "dotted") +
+  geom_hline(yintercept = mean_econ_1, data = subset(energyact_fin_long, intendedVote == 1), color = "blue", linetype = "dotdash") +
+  geom_hline(yintercept = mean_env_0, data = subset(energyact_fin_long, intendedVote == 0), color = "green", linetype = "dotted") +
+  geom_hline(yintercept = mean_env_1, data = subset(energyact_fin_long, intendedVote == 1), color = "green", linetype = "dotdash") +
+  annotate("text", x = Inf, y = 1, hjust = 1.1, vjust = 1, 
+           label = paste("Mean Econ All:", round(mean_econ_all, 2), "\n",
+                         "Mean Env All:", round(mean_env_all, 2), "\n",
+                         "Mean Econ 0:", round(mean_econ_0, 2), "\n",
+                         "Mean Econ 1:", round(mean_econ_1, 2), "\n",
+                         "Mean Env 0:", round(mean_env_0, 2), "\n",
+                         "Mean Env 1:", round(mean_env_1, 2)), 
+           color = "black", size = 3) +
+  scale_color_manual(values = c("max_similarity_econ" = "blue", "max_similarity_env" = "green")) +
+  facet_wrap(~ intendedVote) +
+  theme_minimal() +
+  theme(axis.text.x = element_blank()) +
+  labs(x = "Words", y = "Max Similarity", title = "Similarity Scores for Economy and Environmental Protection Categories") +
+  scale_y_continuous(breaks = seq(0, 1, by = 0.05))
+
+```
+```{r}
+#Export plots
+# Export plot_sim_econ
+ggsave("plot_sim_econ.png", plot = plot_sim_econ, width = 10, height = 8, dpi = 300)
+
+# Export plot_sim_env
+ggsave("plot_sim_env.png", plot = plot_sim_env, width = 10, height = 8, dpi = 300)
+
+# Export plot_H1_median
+ggsave("plot_H1_median.png", plot = plot_H1_median, width = 10, height = 8, dpi = 300)
+
+# Export plot_H1_mean
+ggsave("plot_H1_mean.png", plot = plot_H1_mean, width = 10, height = 8, dpi = 300)
+
+```
+
+
+```{r}
+#How many words are ambivalent (above both thresholds)
+both_conditions_count <- sum(energyact_fin$max_similarity_econ > 0.75 & energyact_fin$max_similarity_env > 0.82)
+print(both_conditions_count)
+```
+```{r}
+#Category assignment
+energyact_fin$category <- ifelse(energyact_fin$max_similarity_econ > 0.75 & energyact_fin$max_similarity_env > 0.82, "amb",
+                                 ifelse(energyact_fin$max_similarity_econ > 0.75, "econ",
+                                        ifelse(energyact_fin$max_similarity_env > 0.82, "env", "other")))
+```
+
+```{r}
+#Manually categorize 50 rows to check validity of embedding categorization
+set.seed(42)  # Setting a seed for reproducibility
 sampled_rows <- sample_n(energyact_fin, 50)
 
 # View the sampled rows
 print(sampled_rows$word)
 
-sampled_rows$manual_cat <- c("other","other","other","other","other","economy","economy","other","other","other","economy","other","other","other","other","other","other","other","other","other","other","other","other","other","other","other","other","other","other","other","economy","other","other","other","other","other","economy","other","other","other","other","other","environmental protection","other","other","other","other","other","other","other")
+sampled_rows$manual_cat <- c("other","other","other","econ","other","other","other","other","other","other","other","other","other","env","other","other","env","env","other","econ","other","other","other","other","econ","other","other","econ","other","econ","env","other","other","other","other","other","other","other","env","econ","other","other","other","other","other","other","other","other","other","env")
 ```
 
 ```{r}
-# Comparison
-correct_matches065 <- sum(sampled_rows$category == sampled_rows$manual_cat)
-
-correct_matches075 <- sum(sampled_rows$category2 == sampled_rows$manual_cat)
-
-correct_matches080 <- sum(sampled_rows$category3 == sampled_rows$manual_cat)
+# Compare manual labeling with automated labeling
+correct_matches <- sum(sampled_rows$category == sampled_rows$manual_cat)
 
 # Calculate the ratio
-match_ratio065 <- correct_matches065 / nrow(sampled_rows)
-
-match_ratio075 <- correct_matches075 / nrow(sampled_rows)
-
-match_ratio080 <- correct_matches080 / nrow(sampled_rows)
+match_ratio <- correct_matches / nrow(sampled_rows)
 
 # Print the ratio
-print(match_ratio065)
-print(match_ratio075)
-print(match_ratio080)
+print(match_ratio)
 ```
 
 ```{r}
 # Subset to find rows where categorizations do not match
-non_matching_rows065 <- sampled_rows[sampled_rows$category != sampled_rows$manual_cat, ]
-non_matching_rows075 <- sampled_rows[sampled_rows$category2 != sampled_rows$manual_cat, ]
-non_matching_rows080 <- sampled_rows[sampled_rows$category3 != sampled_rows$manual_cat, ]
-
+non_matching_rows <- sampled_rows[sampled_rows$category != sampled_rows$manual_cat, ]
 
 # Print the non-matching rows
-print(non_matching_rows065[, c("word", "category", "manual_cat")])
-print(non_matching_rows075[, c("word", "category2", "manual_cat")])
-print(non_matching_rows080[, c("word", "category3", "manual_cat")])
+print(non_matching_rows[, c("word", "category", "manual_cat")])
+
 ```
 
 ```{r}
-#How many people that mentioned economy words (H1=1) voted for (1) or against (0) the law
-# Filter rows where H1 = 1 (Economy words)
-economy_words <- subset(energyact_fin, category3 == "economy")
+#Frequency table of categories mentioned by participants depending on vote
+category_counts <- energyact_fin %>%
+  group_by(participantID, intendedVote, category) %>%
+  summarize(count = n(), .groups = 'drop') %>%
+  ungroup()
 
-# Create a contingency table for economy words vs intended vote
-economy_vote_table <- table(economy_words$intendedVote)
+summary_table <- category_counts %>%
+  group_by(intendedVote) %>%
+  summarize(econ_count = sum(count[category == "econ"]),
+            env_count = sum(count[category == "env"]),
+            amb_count = sum(count[category == "amb"]),
+            other_count = sum(count[category == "other"]), 
+            .groups = 'drop')
 
-#Create percentages table as absolute numbers are different
-economy_vote_perc <- prop.table(economy_vote_table) * 100
-
-# Print the table
-print("Percentage Table for Economy Words (category3 = economy) and Voting:")
-print(economy_vote_perc)
-
-#How many people that mentioned environmental protection words (H1=2) voted for (1) or against (0) the law
-
-# Filter rows where H1 = 2 (Environmental protection words)
-env_prot_words <- subset(energyact_fin, category3 == "environmental protection")
-
-# Create a contingency table for environmental protection words vs intended vote
-env_prot_vote_table <- table(env_prot_words$intendedVote)
-
-#Create percentages table as absolute numbers are different
-env_prot_vote_perc <- prop.table(env_prot_vote_table) * 100
-# Print the table
-print("Table for Environmental Protection Words (category3 = environmental protection) and Voting:")
-print(env_prot_vote_perc)
-```
-```{r}
-#Create category3 Factor variable
-# Convert to factor
-energyact_fin$fcategory3 <- factor(energyact_fin$category3, levels= c("economy","environmental protection","other"))
-
-# Subset for 'for' voters, including only fH1 == 0 and fH1 == 1
-for_voters <- subset(energyact_fin, intendedVote == 1 & fcategory3 %in% c("economy","environmental protection"))
-
-# Subset for 'against' voters, including only fH1 == 0 and fH1 == 1
-against_voters <- subset(energyact_fin, intendedVote == 0 & fcategory3 %in% c("economy","environmental protection"))
-
-# Calculate percentages for economy words among 'for' and 'against' voters
-economy_words_for <- sum(for_voters$fcategory3 == "economy")
-percentage_economy_for <- economy_words_for / nrow(for_voters) * 100
-economy_words_against <- sum(against_voters$fcategory3 == "economy")
-percentage_economy_against <- economy_words_against / nrow(against_voters) * 100
-
-# Print the results
-cat("Percentage of voters 'for' mentioning economy words:", percentage_economy_for, "%\n")
-cat("Percentage of voters 'against' mentioning economy words:", percentage_economy_against, "%\n")
+print(summary_table)
 ```
 
 ```{r}
-# Calculate percentages for environmental protection words among 'for' and 'against' voters
-env_protection_words_for <- sum(for_voters$fcategory3 == "environmental protection")
-percentage_env_protection_for <- env_protection_words_for / nrow(for_voters) * 100
+# Binary variables for whether a participant mentioned a category
+energyact_fin_binary <- energyact_fin %>%
+  group_by(participantID) %>%
+  summarize(econ_mentioned = as.numeric(any(category == "econ")),
+            env_mentioned = as.numeric(any(category == "env")),
+            intendedVote = first(intendedVote),
+            .groups = 'drop')
 
-env_protection_words_against <- sum(against_voters$fcategory3 == "environmental protection")
-percentage_env_protection_against <- env_protection_words_against / nrow(against_voters) * 100
-
-# Print the results
-cat("Percentage of voters 'for' mentioning environmental protection words:", percentage_env_protection_for, "%\n")
-cat("Percentage of voters 'against' mentioning environmental protection words:", percentage_env_protection_against, "%\n")
 ```
 
 ```{r}
-#Logistic regression
-# Exclude fcategory3 = other
-filtered_data <- subset(energyact_fin, fcategory3 != "other")
+# Model for H1a
+# Combined model for H1a and H1b
+model_H1 <- glm(intendedVote ~ econ_mentioned + env_mentioned, family = binomial(link = "logit"), data = energyact_fin_binary)
+summary(model_H1)
 
-# Create binary variables for economy and environmental protection words
-filtered_data$economy_mentioned <- as.numeric(filtered_data$fcategory3 == "economy")
-filtered_data$env_prot_mentioned <- as.numeric(filtered_data$fcategory3 == "environmental protection")
+# Calculating odds ratios from the model coefficients
+odds_ratio_econ <- exp(coef(model_H1)["econ_mentioned"])
+odds_ratio_env <- exp(coef(model_H1)["env_mentioned"])
 
-# Logistic regression for economy words
-logit_model_economy <- glm(intendedVote ~ economy_mentioned, family = "binomial", data = filtered_data)
-summary(logit_model_economy)
+# Print the odds ratios
+print("Odds Ratio for econ_mentioned:")
+print(odds_ratio_econ)
 
-#Odds Ratio
-odds_ratio_economy <- exp(logit_model_economy$coefficients["economy_mentioned"])
-print("Odds Ratio for economy_mentioned:")
-print(odds_ratio_economy)
-
-# Logistic regression for environmental protection words
-logit_model_env_prot <- glm(intendedVote ~ env_prot_mentioned, family = "binomial", data = filtered_data)
-summary(logit_model_env_prot)
-
-#Odds Ratio
-odds_ratio_env <- exp(logit_model_env_prot$coefficients["env_prot_mentioned"])
-print("Odds Ratio for env_prot_mentioned:")
+print("Odds Ratio for env_mentioned:")
 print(odds_ratio_env)
 ```
 
 ```{r}
-#Bonferroni correction for multiple testing
-# Extract p-values
-p_value_economy <- summary(logit_model_economy)$coefficients["economy_mentioned", "Pr(>|z|)"]
-p_value_env_prot <- summary(logit_model_env_prot)$coefficients["env_prot_mentioned", "Pr(>|z|)"]
+# Cox and Snell R-squared
+null_log_likelihood <- logLik(glm(intendedVote ~ 1, family = binomial(link = "logit"), data = energyact_fin_binary))
+model_log_likelihood <- logLik(model_H1)
+cox_snell_r_squared <- 1 - exp((2/nrow(energyact_fin_binary)) * (null_log_likelihood - model_log_likelihood))
+print(paste("Cox and Snell R-squared:", cox_snell_r_squared))
 
-# Combine p-values into a vector
-p_values <- c(economy = p_value_economy, env_prot = p_value_env_prot)
+# Nagelkerke R-squared
+nagelkerke_r_squared <- cox_snell_r_squared / (1 - exp((2 * null_log_likelihood) / nrow(energyact_fin_binary)))
+print(paste("Nagelkerke R-squared:", nagelkerke_r_squared))
 
-# Bonferroni correction
-p_adjusted_bonferroni <- p.adjust(p_values, method = "bonferroni")
 
-# Holm correction (another common method)
-p_adjusted_holm <- p.adjust(p_values, method = "holm")
-
-# Printing adjusted p-values
-print("Adjusted P-Values (Bonferroni):")
-print(p_adjusted_bonferroni)
-
-print("Adjusted P-Values (Holm):")
-print(p_adjusted_holm)
-```
-
-```{r}
-#Calculating model fit (McFadden's R-squared)
-calculate_mcfadden_r_squared <- function(model) {
-  ll_full <- logLik(model)  # Log-likelihood of the full model
-  ll_null <- logLik(glm(formula = intendedVote ~ 1, family = "binomial", data = model$data))  # Log-likelihood of the null model
-  1 - as.numeric(ll_full / ll_null)
-}
-
-# McFadden’s R-squared for the economy model
-r_squared_economy <- calculate_mcfadden_r_squared(logit_model_economy)
-print("McFadden's R-squared for the Economy Model:")
-print(r_squared_economy)
-
-# McFadden’s R-squared for the environmental protection model
-r_squared_env_prot <- calculate_mcfadden_r_squared(logit_model_env_prot)
-print("McFadden's R-squared for the Environmental Protection Model:")
-print(r_squared_env_prot)
 ```
