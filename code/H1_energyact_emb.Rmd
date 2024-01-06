@@ -12,7 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 #Install and load necessary packages
-packages <- c("devtools","here","dplyr","tidyverse","readxl","writexl","hunspell","text2vec")
+packages <- c("devtools","here","dplyr","tidyverse","readxl","writexl","hunspell","text2vec","car","broom")
 for (package in packages) {
   if (!requireNamespace(package, quietly = TRUE)) {
     install.packages(package)
@@ -249,6 +249,7 @@ ggsave("plot_H1_mean.png", plot = plot_H1_mean, width = 10, height = 8, dpi = 30
 both_conditions_count <- sum(energyact_fin$max_similarity_econ > 0.75 & energyact_fin$max_similarity_env > 0.82)
 print(both_conditions_count)
 ```
+
 ```{r}
 #Category assignment
 energyact_fin$category <- ifelse(energyact_fin$max_similarity_econ > 0.75 & energyact_fin$max_similarity_env > 0.82, "amb",
@@ -304,8 +305,115 @@ summary_table <- category_counts %>%
 
 print(summary_table)
 ```
+```{r}
+participant_summary <- energyact_fin %>%
+  group_by(participantID) %>%
+  summarize(total_words = n(),
+            econ_words = sum(category == "econ"),
+            env_words = sum(category == "env"),
+            intendedVote = first(intendedVote)) %>%
+  mutate(proportion_econ = econ_words / total_words,
+         proportion_env = env_words / total_words) %>%
+  ungroup()
+```
 
 ```{r}
+summary_stats <- participant_summary %>%
+  summarise(mean_proportion_econ = mean(proportion_econ, na.rm = TRUE),
+            median_proportion_econ = median(proportion_econ, na.rm = TRUE),
+            sd_proportion_econ = sd(proportion_econ, na.rm = TRUE),
+            mean_proportion_env = mean(proportion_env, na.rm = TRUE),
+            median_proportion_env = median(proportion_env, na.rm = TRUE),
+            sd_proportion_env = sd(proportion_env, na.rm = TRUE))
+
+print(summary_stats)
+
+intended_vote_distribution <- participant_summary %>%
+  group_by(intendedVote) %>%
+  summarise(count = n(),
+            proportion = count / nrow(participant_summary)) 
+
+print(intended_vote_distribution)
+```
+
+```{r}
+#Assumptions for logistic regression
+table(participant_summary$intendedVote)
+
+#Data independent (single participants)
+
+#Multicollinearity
+model_for_vif <- glm(intendedVote ~ proportion_econ + proportion_env, data = participant_summary, family = binomial)
+vif_result <- vif(model_for_vif)
+print(vif_result)
+#1.007 = no significant multicollinearity
+
+#Outliers
+cooks_distances <- broom::augment(model_for_vif) %>% dplyr::select(.cooksd)
+plot(cooks_distances$.cooksd, ylab = "Cook's Distance")
+```
+
+
+```{r}
+# Adding a small constant to probabilities
+epsilon <- 0.001
+participant_summary$log_odds_intendedVote <- with(participant_summary, 
+                                                  log((intendedVote + epsilon) / (1 - intendedVote + epsilon)))
+
+# Plot for proportion_econ
+ggplot(participant_summary, aes(x = proportion_econ, y = log_odds_intendedVote)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Log Odds of IntendedVote vs Proportion of Econ Words",
+       x = "Proportion of Econ Words", y = "Log Odds of IntendedVote")
+
+# Plot for proportion_env
+ggplot(participant_summary, aes(x = proportion_env, y = log_odds_intendedVote)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Log Odds of IntendedVote vs Proportion of Env Words",
+       x = "Proportion of Env Words", y = "Log Odds of IntendedVote")
+
+```
+
+
+
+```{r}
+model <- glm(intendedVote ~ proportion_econ + proportion_env, family = binomial(link = "logit"), data = participant_summary)
+summary(model)
+
+# Extracting model coefficients
+coefficients <- coef(model)
+
+# Calculating odds ratios
+odds_ratio_econ <- exp(coefficients["proportion_econ"])
+odds_ratio_env <- exp(coefficients["proportion_env"])
+
+# Print the odds ratios
+print(paste("Odds Ratio for proportion_econ:", odds_ratio_econ))
+print(paste("Odds Ratio for proportion_env:", odds_ratio_env))
+
+```
+```{r}
+# Log-likelihood of the model
+log_likelihood_model <- logLik(model)
+
+# Log-likelihood of the null model (only intercept)
+null_model <- glm(intendedVote ~ 1, family = binomial(link = "logit"), data = participant_summary)
+log_likelihood_null <- logLik(null_model)
+
+cox_snell_r_squared <- 1 - exp((2/nrow(participant_summary)) * (log_likelihood_null - log_likelihood_model))
+
+nagelkerke_r_squared <- cox_snell_r_squared / (1 - exp((2 * log_likelihood_null) / nrow(participant_summary)))
+
+print(paste("Cox and Snell R-squared:", cox_snell_r_squared))
+print(paste("Nagelkerke R-squared:", nagelkerke_r_squared))
+```
+
+
+
+
+```{r,eval=F,echo=F}
 # Binary variables for whether a participant mentioned a category
 energyact_fin_binary <- energyact_fin %>%
   group_by(participantID) %>%
@@ -316,7 +424,7 @@ energyact_fin_binary <- energyact_fin %>%
 
 ```
 
-```{r}
+```{r,eval=F,echo=F}
 # Model for H1a
 # Combined model for H1a and H1b
 model_H1 <- glm(intendedVote ~ econ_mentioned + env_mentioned, family = binomial(link = "logit"), data = energyact_fin_binary)
@@ -334,7 +442,7 @@ print("Odds Ratio for env_mentioned:")
 print(odds_ratio_env)
 ```
 
-```{r}
+```{r,eval=F, echo=F}
 # Cox and Snell R-squared
 null_log_likelihood <- logLik(glm(intendedVote ~ 1, family = binomial(link = "logit"), data = energyact_fin_binary))
 model_log_likelihood <- logLik(model_H1)
@@ -344,6 +452,4 @@ print(paste("Cox and Snell R-squared:", cox_snell_r_squared))
 # Nagelkerke R-squared
 nagelkerke_r_squared <- cox_snell_r_squared / (1 - exp((2 * null_log_likelihood) / nrow(energyact_fin_binary)))
 print(paste("Nagelkerke R-squared:", nagelkerke_r_squared))
-
-
 ```
