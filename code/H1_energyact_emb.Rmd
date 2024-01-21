@@ -289,7 +289,7 @@ print(non_matching_rows[, c("word", "category", "manual_cat")])
 ```
 
 ```{r}
-#Frequency table of categories mentioned by participants depending on vote
+#Frequency table of categories mentioned by participants depending on vote, and for t1 & t2 separately
 category_counts <- energyact_fin %>%
   group_by(participantID, intendedVote, category) %>%
   summarize(count = n(), .groups = 'drop') %>%
@@ -304,9 +304,69 @@ summary_table <- category_counts %>%
             .groups = 'drop')
 
 print(summary_table)
+
+# For wave t1
+category_counts_t1 <- energyact_fin %>%
+  filter(wave == "t1") %>%
+  group_by(participantID, intendedVote, category) %>%
+  summarize(count = n(), .groups = 'drop') %>%
+  ungroup()
+
+summary_table_t1 <- category_counts_t1 %>%
+  group_by(intendedVote) %>%
+  summarize(econ_count = sum(count[category == "econ"]),
+            env_count = sum(count[category == "env"]),
+            amb_count = sum(count[category == "amb"]),
+            other_count = sum(count[category == "other"]), 
+            .groups = 'drop')
+
+print(summary_table_t1)
+
+# For wave t2
+category_counts_t2 <- energyact_fin %>%
+  filter(wave == "t2") %>%
+  group_by(participantID, intendedVote, category) %>%
+  summarize(count = n(), .groups = 'drop') %>%
+  ungroup()
+
+summary_table_t2 <- category_counts_t1 %>%
+  group_by(intendedVote) %>%
+  summarize(econ_count = sum(count[category == "econ"]),
+            env_count = sum(count[category == "env"]),
+            amb_count = sum(count[category == "amb"]),
+            other_count = sum(count[category == "other"]), 
+            .groups = 'drop')
+
+print(summary_table_t2)
 ```
 ```{r}
+#whole dataset
 participant_summary <- energyact_fin %>%
+  group_by(participantID) %>%
+  summarize(total_words = n(),
+            econ_words = sum(category == "econ"),
+            env_words = sum(category == "env"),
+            intendedVote = first(intendedVote)) %>%
+  mutate(proportion_econ = econ_words / total_words,
+         proportion_env = env_words / total_words) %>%
+  ungroup()
+
+# For wave t1
+participant_summary_t1 <- energyact_fin %>%
+  filter(wave == "t1") %>%
+  group_by(participantID) %>%
+  summarize(total_words = n(),
+            econ_words = sum(category == "econ"),
+            env_words = sum(category == "env"),
+            intendedVote = first(intendedVote)) %>%
+  mutate(proportion_econ = econ_words / total_words,
+         proportion_env = env_words / total_words) %>%
+  ungroup()
+
+
+# For wave t2
+participant_summary_t2 <- energyact_fin %>%
+  filter(wave == "t2") %>%
   group_by(participantID) %>%
   summarize(total_words = n(),
             econ_words = sum(category == "econ"),
@@ -334,6 +394,43 @@ intended_vote_distribution <- participant_summary %>%
             proportion = count / nrow(participant_summary)) 
 
 print(intended_vote_distribution)
+
+#for wave t1
+summary_stats_t1 <- participant_summary_t1 %>%
+  summarise(mean_proportion_econ = mean(proportion_econ, na.rm = TRUE),
+            median_proportion_econ = median(proportion_econ, na.rm = TRUE),
+            sd_proportion_econ = sd(proportion_econ, na.rm = TRUE),
+            mean_proportion_env = mean(proportion_env, na.rm = TRUE),
+            median_proportion_env = median(proportion_env, na.rm = TRUE),
+            sd_proportion_env = sd(proportion_env, na.rm = TRUE))
+
+print(summary_stats_t1)
+
+intended_vote_distribution_t1 <- participant_summary_t1 %>%
+  group_by(intendedVote) %>%
+  summarise(count = n(),
+            proportion = count / nrow(participant_summary)) 
+
+print(intended_vote_distribution_t1)
+
+#For wave t2
+summary_stats_t2 <- participant_summary_t2 %>%
+  summarise(mean_proportion_econ = mean(proportion_econ, na.rm = TRUE),
+            median_proportion_econ = median(proportion_econ, na.rm = TRUE),
+            sd_proportion_econ = sd(proportion_econ, na.rm = TRUE),
+            mean_proportion_env = mean(proportion_env, na.rm = TRUE),
+            median_proportion_env = median(proportion_env, na.rm = TRUE),
+            sd_proportion_env = sd(proportion_env, na.rm = TRUE))
+
+print(summary_stats_t2)
+
+# For wave t2
+intended_vote_distribution_t2 <- participant_summary_t2 %>%
+  group_by(intendedVote) %>%
+  summarise(count = n(),
+            proportion = count / nrow(participant_summary)) 
+
+print(intended_vote_distribution_t2)
 ```
 
 ```{r}
@@ -379,6 +476,7 @@ ggplot(participant_summary, aes(x = proportion_env, y = log_odds_intendedVote)) 
 
 
 ```{r}
+#Logistic regression whole dataset
 model <- glm(intendedVote ~ proportion_econ + proportion_env, family = binomial(link = "logit"), data = participant_summary)
 summary(model)
 
@@ -392,10 +490,68 @@ odds_ratio_env <- exp(coefficients["proportion_env"])
 # Print the odds ratios
 print(paste("Odds Ratio for proportion_econ:", odds_ratio_econ))
 print(paste("Odds Ratio for proportion_env:", odds_ratio_env))
+```
 
+```{r}
+# Logistic regression for wave t1
+model_t1 <- glm(intendedVote ~ proportion_econ + proportion_env, family = binomial(link = "logit"), data = participant_summary_t1)
+summary(model_t1)
+
+# Extracting model coefficients
+coefficients_t1 <- coef(model_t1)
+
+# Calculating odds ratios
+odds_ratio_econ_t1 <- exp(coefficients_t1["proportion_econ"])
+odds_ratio_env_t1 <- exp(coefficients_t1["proportion_env"])
+
+# Print the odds ratios
+print(paste("Odds Ratio for proportion_econ:", odds_ratio_econ_t1))
+print(paste("Odds Ratio for proportion_env:", odds_ratio_env_t1))
+```
+
+```{r}
+# Logistic regression for wave t2
+model_t2 <- glm(intendedVote ~ proportion_econ + proportion_env, family = binomial(link = "logit"), data = participant_summary_t2)
+summary(model_t2)
+
+# Extracting model coefficients
+coefficients_t2 <- coef(model_t2)
+
+# Calculating odds ratios
+odds_ratio_econ_t2 <- exp(coefficients_t2["proportion_econ"])
+odds_ratio_env_t2 <- exp(coefficients_t2["proportion_env"])
+
+# Print the odds ratios
+print(paste("Odds Ratio for proportion_econ:", odds_ratio_econ_t2))
+print(paste("Odds Ratio for proportion_env:", odds_ratio_env_t2))
 ```
 ```{r}
-# Log-likelihood of the model
+#Bonferroni Correction for multiple testing
+# Extract p-values from each model
+# Replace 'summary(model)$coefficients' with 'coefficients' if it contains the full summary
+p_value_econ_full <- summary(model)$coefficients["proportion_econ", "Pr(>|z|)"]
+p_value_env_full <- summary(model)$coefficients["proportion_env", "Pr(>|z|)"]
+
+p_value_econ_t1 <- summary(model_t1)$coefficients["proportion_econ", "Pr(>|z|)"]
+p_value_env_t1 <- summary(model_t1)$coefficients["proportion_env", "Pr(>|z|)"]
+
+p_value_econ_t2 <- summary(model_t2)$coefficients["proportion_econ", "Pr(>|z|)"]
+p_value_env_t2 <- summary(model_t2)$coefficients["proportion_env", "Pr(>|z|)"]
+
+# Combine all p-values
+p_values_all <- c(p_value_econ_full, p_value_env_full, 
+                  p_value_econ_t1, p_value_env_t1, 
+                  p_value_econ_t2, p_value_env_t2)
+
+# Apply Bonferroni correction
+adjusted_p_values <- p.adjust(p_values_all, method = "bonferroni")
+
+# Print adjusted p-values
+print(adjusted_p_values)
+```
+
+```{r}
+# Log-likelihood of the model for entire dataset
 log_likelihood_model <- logLik(model)
 
 # Log-likelihood of the null model (only intercept)
@@ -409,6 +565,39 @@ nagelkerke_r_squared <- cox_snell_r_squared / (1 - exp((2 * log_likelihood_null)
 print(paste("Cox and Snell R-squared:", cox_snell_r_squared))
 print(paste("Nagelkerke R-squared:", nagelkerke_r_squared))
 ```
+
+```{r}
+# Log-likelihood of the model for wave t1
+log_likelihood_model_t1 <- logLik(model_t1)
+
+# Log-likelihood of the null model (only intercept)
+null_model_t1 <- glm(intendedVote ~ 1, family = binomial(link = "logit"), data = participant_summary_t1)
+log_likelihood_null_t1 <- logLik(null_model_t1)
+
+cox_snell_r_squared_t1 <- 1 - exp((2/nrow(participant_summary_t1)) * (log_likelihood_null_t1 - log_likelihood_model_t1))
+
+nagelkerke_r_squared_t1 <- cox_snell_r_squared_t1 / (1 - exp((2 * log_likelihood_null_t1) / nrow(participant_summary_t1)))
+
+print(paste("Cox and Snell R-squared:", cox_snell_r_squared_t1))
+print(paste("Nagelkerke R-squared:", nagelkerke_r_squared_t1))
+```
+
+```{r}
+# Log-likelihood of the model for wave t2
+log_likelihood_model_t2 <- logLik(model_t2)
+
+# Log-likelihood of the null model (only intercept)
+null_model_t2 <- glm(intendedVote ~ 1, family = binomial(link = "logit"), data = participant_summary_t2)
+log_likelihood_null_t2 <- logLik(null_model_t2)
+
+cox_snell_r_squared_t2 <- 1 - exp((2/nrow(participant_summary_t2)) * (log_likelihood_null_t2 - log_likelihood_model_t2))
+
+nagelkerke_r_squared_t2 <- cox_snell_r_squared_t2 / (1 - exp((2 * log_likelihood_null_t2) / nrow(participant_summary_t2)))
+
+print(paste("Cox and Snell R-squared:", cox_snell_r_squared_t2))
+print(paste("Nagelkerke R-squared:", nagelkerke_r_squared_t2))
+```
+
 
 
 

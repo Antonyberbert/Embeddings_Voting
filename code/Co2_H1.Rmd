@@ -1,0 +1,294 @@
+```{r}
+#Install and load necessary packages
+packages <- c("devtools","here","dplyr","tidyverse","readxl","writexl","hunspell","text2vec","car","broom")
+for (package in packages) {
+  if (!requireNamespace(package, quietly = TRUE)) {
+    install.packages(package)
+  }
+}
+lapply(packages,library, character.only=T)
+```
+
+```{r}
+#Install and load embedR
+if (!requireNamespace("embedR", quietly = TRUE)) {
+    # If not installed, install it using devtools
+    devtools::install_github("dwulff/embedR")
+}
+
+library("embedR")
+```
+
+
+
+```{r}
+#Read csv data of vote from 13.06.2021
+vote_df <- read.csv("https://swissvotes.ch/attachments/7293958a71051fb963b701a676158da7d82cd36355c433591a22407a1c2bcfaf",sep=";",header=T, dec=".")
+```
+
+```{r}
+#Select columns on reasons for voting for or against the carbon tax
+co2_df <- vote_df%>%
+  select(VOTE4,REASON1ACC4_01:REASON1ACC4_05, REASON2ACC4_01:REASON2ACC4_06,
+         REASON1DEN4_01:REASON1DEN4_04, REASON2DEN4_01:REASON2DEN4_05)
+
+#Create subsets for yes and no voters
+co2_no <- co2_df%>%
+  select(VOTE4,REASON1DEN4_01:REASON1DEN4_04, REASON2DEN4_01:REASON2DEN4_05)%>%
+  filter(VOTE4==2 & REASON1DEN4_01 != 99)
+
+co2_yes <- co2_df%>%
+  select(VOTE4,REASON1ACC4_01:REASON1ACC4_05, REASON2ACC4_01:REASON2ACC4_06)%>%
+  filter(VOTE4==1 & REASON1ACC4_01 != 99)
+```
+
+```{r}
+# Combine reasons columns for 'No' voters and count frequencies
+reason_counts_no <- co2_no %>%
+  select(REASON1DEN4_01:REASON1DEN4_04, REASON2DEN4_01:REASON2DEN4_05) %>%
+  gather(key = "reason_key", value = "reason_code") %>%
+  filter(reason_code >= 10 & reason_code <= 101) %>%
+  count(reason_code) %>%
+  arrange(desc(n))
+
+# Combine reasons columns for 'Yes' voters and count frequencies
+reason_counts_yes <- co2_yes %>%
+  select(REASON1ACC4_01:REASON1ACC4_05, REASON2ACC4_01:REASON2ACC4_06) %>%
+  gather(key = "reason_key", value = "reason_code") %>%
+  filter(reason_code >= 10 & reason_code <= 101) %>%
+  count(reason_code) %>%
+  arrange(desc(n))
+```
+
+```{r}
+# Mapping for reasons for voting 'yes'
+reasons_yes <- data.frame(
+  reason_code = c(10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 29, 30, 31, 32, 33, 34, 35, 36, 37, 39, 40, 41, 42, 43, 44, 45, 46, 47, 49, 50, 51, 52, 53, 54, 55, 59, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99),
+  reason_text = c("Allgemeines",
+"allgemeine Antworten (z.B. schon mal gehört)",
+"allgemeine positive Äusserungen (z.B. wichtig/gut/interessant/vernünftig)",
+"allgemeine negative Äusserungen (z.B. nicht gut so wie es jetzt ist)",
+"Bauchgefühl",
+"direkt betroffen (z.B. Folgen Klimawandel spürbar/lebe bereits energieffizient)",
+"Sympathie-Votum/Diskussion unterstützen",
+"Abstimmungskampf",
+"Corona",
+"Anderes zu Allgemeines",
+"politische Gründe",
+"zukunftsweisendes Gesetz",
+"politisches Zeichen setzen",
+"(Pariser) Klimaabkommen einhalten",
+"guter Kompromiss",
+"Handeln statt Reden (z.B. jetzt oder nie)",
+"lieber kleine Schritte als gar keine Schritte",
+"Anderes zu politische Gründe",
+"wirtschaftliche Gründe",
+"Steuerung via Marktmechanismen",
+"Verteuerung von schädlichen Produkten/Produktionen",
+"Änderung des Konsumverhaltens",
+"zukunftsfähige Arbeitsplätze schaffen",
+"Verursacherprinzip fördern/Mehrkosten (nur für Klimasünder)",
+"Unabhängigkeit von Öl-Firmen",
+"Schäden von Klimawandel wären teurer",
+"Anderes zu wirtschaftliche Gründe",
+"Umweltschutz",
+"CO2 Bilanz verbessern",
+"Umweltschutz",
+"Klimawandel",
+"Energiewende herbeiführen",
+"dringend handeln",
+"Atemluft",
+"klimafreundliche Technologien/Investitionen fördern",
+"Anderes zu Umweltschutz",
+"nächste Generation",
+"nächste Generationen schützen",
+"Verantwortung für nächste Generationen",
+"nur ein Planet",
+"Änderung des Reiseverhaltens",
+"Schweiz als Vorbild",
+"Anderes zu nächste Generation",
+"Anderes",
+"falsche Nennungen/Antworten",
+"Empfehlungen von Parteien",
+"Empfehlungen von Verbänden",
+"Empfehlungen von Familienmitgliedern/Verwandten/Angehörigen",
+"Empfehlungen von Bundesrat/Parlament/Kantonen(-Regierungen)",
+"wegen Fernsehbeitrag/Zeitungsartikel/Medienberichterstattung",
+"Verwechslung mit anderen Vorlagen",
+"weiss nicht/Nein",
+"keine Antwort"))
+
+# Mapping for reasons for voting 'no'
+reasons_no <- data.frame(
+  reason_code = c(10, 11, 12, 13, 14, 15, 16, 17, 19, 20, 21, 22, 23, 24, 25, 26, 27, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 49, 50, 51, 52, 53, 54, 55, 56, 57, 59, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99),
+  reason_text = c("Allgemeines",
+"allgemeine Antworten (z.B. schon mal gehört)",
+"allgemeine negative Äusserungen (z.B. schlecht/bringt nichts/sinnlos, ungerechtes/asoziales Gesetz)",
+"Bauchgefühl",
+"direkt betroffen (z.B. leidenschaftlicher Autofahrer/Vielflieger/alte Heizung etc)",
+"Corona",
+"Abstimmungskampf",
+"zu extrem/übertriebene Massnahmen/unrealistisch",
+"Anderes zu Allgemeines",
+"politische Gründe",
+"derzeitige Gesetzgebung genügt bereits",
+"Einnahmequelle für den Bund",
+"andere Anliegen sind dringender",
+"Stadt-Land-Graben nicht berücksichtigt",
+"Ungerechtes/asoziales Gesetz",
+"Gesetz war überladen",
+"gegen CO2-Steuer",
+"Anderes zu politische Gründe",
+"wirtschaftliche Gründe",
+"gegen Umverteilung",
+"höherer Benzinpreis",
+"höherer Heizöl-Preis",
+"Reisen/Fliegen wird teurer",
+"Problem muss mit Innovation/Technik gelöst werden",
+"Kosten-Nutzen-Verhältnis stimmt nicht",
+"zu viel Bürokratie/zu starker Markteingriff",
+"schadet der Schweizer Wirtschaft",
+"Anderes zu wirtschaftliche Gründe",
+"Umwelt",
+"Hysterie um Klimawandel übertrieben",
+"nützt dem Klima zu wenig",
+"Klimadebatte basiert auf falschen Fakten",
+"Schweiz ist zu klein um etwas zu bewirken/Schweizer Alleingang bringt nichts",
+"Anderes zu Umwelt",
+"gesellschaftliche Positionen",
+"fördert Zweiklassen-Gesellschaft",
+"ländliche Bevölkerung klar im Nachteil",
+"gegen Klimajugend",
+"gegen «grüne» Anliegen",
+"Schweiz zu klein als Vorbild",
+"schwächt den Mittelstand/die Mittelschicht, nicht auf Kosten der Mittelschicht",
+"schadet Randregionen",
+"Anderes zu gesellschaftliche Positionen",
+"Anderes",
+"falsche Nennungen/Antworten",
+"Empfehlungen von Parteien",
+"Empfehlungen von Verbänden",
+"Empfehlungen von Familienmitgliedern/Verwandten/Angehörigen",
+"Empfehlungen von Bundesrat/Parlament/Kantonen(-Regierungen)",
+"wegen Fernsehbeitrag/Zeitungsartikel/Medienberichterstattung",
+"Verwechslung mit anderen Vorlagen",
+"weiss nicht/Nein",
+"keine Antwort"))
+
+# Joining with reason_counts_yes and retaining original column names
+reason_counts_yes <- reason_counts_yes %>%
+  left_join(reasons_yes %>% select(reason_code, reason_text), by = "reason_code")
+
+# Joining with reason_counts_no and retaining original column names
+reason_counts_no <- reason_counts_no %>%
+  left_join(reasons_no %>% select(reason_code, reason_text), by = "reason_code")
+
+# View the most frequent reasons for 'Yes' and 'No' voters
+head(reason_counts_yes, 10)
+head(reason_counts_no, 10)
+
+# Remove specified reason codes for reason_counts_yes
+reason_codes_to_remove_yes <- c(10, 11, 12, 13, 18, 19, 90, 91, 97, 98, 99)
+reason_counts_yes <- reason_counts_yes %>% 
+                     filter(!reason_code %in% reason_codes_to_remove_yes)
+
+# Remove specified reason codes for reason_counts_no
+reason_codes_to_remove_no <- c(10, 11, 12, 15, 19, 90, 91, 97, 98, 99)
+reason_counts_no <- reason_counts_no %>%
+                    filter(!reason_code %in% reason_codes_to_remove_no)
+
+
+#Save dfs as rds
+saveRDS(reason_counts_yes, here::here("data","reason_counts_yes.rds"))
+saveRDS(reason_counts_no, here::here("data","reason_counts_no.rds"))
+```
+
+
+```{r}
+#Set token
+#embedR::er_set_tokens("cohere" = "x","huggingface"="x","openai" = "x")
+```
+
+```{r}
+#embed reason categories
+#set.seed(26)
+#yes subset
+#embedding_yes = er_embed(reason_counts_yes$reason_text,api="cohere",model="embed-multilingual-v3.0")
+
+#no subset
+#embedding_no = er_embed(reason_counts_no$reason_text,api="cohere",model="embed-multilingual-v3.0")
+```
+
+```{r}
+#save embeddings as R object
+#saveRDS(embedding_yes, here::here("data","embedding_yes.rds"))
+
+#saveRDS(embedding_no, here::here("data","embedding_no.rds"))
+```
+
+```{r}
+#load embeddings as R object
+embedding_yes <- readRDS(here::here("data","embedding_yes.rds"))
+embedding_no <- readRDS(here::here("data","embedding_no.rds"))
+```
+
+```{r}
+#group embeddings yes
+set.seed(26)
+
+result_yes2b = embedding_yes %>%
+
+  # group similar texts
+  er_group(method = "fuzzy",threshold = 0.9) %>%
+
+  # generate 2D projection
+  er_project(method = "umap") %>%
+
+  # cluster projection
+  er_cluster(method = "louvain",resolution = 1.15) %>%
+
+  # produce data frame
+  er_frame()
+
+#save result as rds
+saveRDS(result_yes2b,here::here("data","result_yes2b.rds"))
+```
+
+```{r}
+#group embeddings no
+set.seed(26)
+
+result_no2b = embedding_no %>%
+
+  # group similar texts
+  er_group(method = "fuzzy",threshold = 0.9) %>%
+
+  # generate 2D projection
+  er_project(method = "umap") %>%
+
+  # cluster projection
+  er_cluster(method = "louvain",resolution = 1.15) %>%
+
+  # produce data frame
+  er_frame()
+
+#save result as rds
+saveRDS(result_no2b,here::here("data","result_no2b.rds"))
+```
+
+```{r}
+#load results as rds
+result_yes2 <- readRDS(here::here("data","result_yes2.rds"))
+result_no2 <- readRDS(here::here("data","result_no2.rds"))
+```
+
+```{r}
+result_yes2b$group_texts <- sapply(result_yes2b$group_texts, toString)
+write_xlsx(result_yes2b, here::here("data","result_yes2b.xlsx"))
+
+result_no2b$group_texts <- sapply(result_no2b$group_texts, toString)
+write_xlsx(result_no2b, here::here("data","result_no2b.xlsx"))
+```
+
+
+

@@ -32,16 +32,16 @@ library("embedR")
 ```{r}
 set.seed(26)
 #read in final dataset
-energyact_fin <- read_xlsx(here::here("data","energyact_final.xlsx"))
+#energyact_fin <- read_xlsx(here::here("data","energyact_final.xlsx"))
 
 #set api tokens
-embedR::er_set_tokens("cohere" = "x","huggingface"="x","openai" = "x")
+#embedR::er_set_tokens("cohere" = "x","huggingface"="x","openai" = "x")
 
-embedding = energyact_fin$word%>%
-  er_embed(api="cohere",model="embed-multilingual-v3.0")
+#embedding = energyact_fin$word%>%
+  #er_embed(api="cohere",model="embed-multilingual-v3.0")
 
 #save embeddings as R object
-saveRDS(embedding, here::here("data","embedding.rds"))
+#saveRDS(embedding, here::here("data","embedding.rds"))
 
 #load embeddings as R object
 #embedding <- readRDS(here::here("data","embedding.rds"))
@@ -53,19 +53,19 @@ saveRDS(embedding, here::here("data","embedding.rds"))
 ```{r}
 set.seed(26)
 
-result_fin = embedding %>%
+#result_fin = embedding %>%
 
   # group similar texts
-  er_group(method = "fuzzy",threshold = 0.9) %>%
+  #er_group(method = "fuzzy",threshold = 0.9) %>%
 
   # generate 2D projection
-  er_project(method = "umap") %>%
+  #er_project(method = "umap") %>%
 
   # cluster projection
-  er_cluster(method = "louvain",resolution = 1.50) %>%
+  #er_cluster(method = "louvain",resolution = 1.50) %>%
 
   # produce data frame
-  er_frame()
+  #er_frame()
 
 #save result as rds
 #saveRDS(result_fin,here::here("data","resultfin_emb.rds"))
