@@ -378,59 +378,69 @@ participant_summary_t2 <- energyact_fin %>%
 ```
 
 ```{r}
+# For the whole dataset
 summary_stats <- participant_summary %>%
-  summarise(mean_proportion_econ = mean(proportion_econ, na.rm = TRUE),
-            median_proportion_econ = median(proportion_econ, na.rm = TRUE),
-            sd_proportion_econ = sd(proportion_econ, na.rm = TRUE),
-            mean_proportion_env = mean(proportion_env, na.rm = TRUE),
-            median_proportion_env = median(proportion_env, na.rm = TRUE),
-            sd_proportion_env = sd(proportion_env, na.rm = TRUE))
+  group_by(intendedVote) %>%
+  summarise(
+    mean_proportion_econ = mean(proportion_econ, na.rm = TRUE),
+    sd_proportion_econ = sd(proportion_econ, na.rm = TRUE),
+    mean_proportion_env = mean(proportion_env, na.rm = TRUE),
+    sd_proportion_env = sd(proportion_env, na.rm = TRUE)
+  )
 
 print(summary_stats)
 
 intended_vote_distribution <- participant_summary %>%
   group_by(intendedVote) %>%
-  summarise(count = n(),
-            proportion = count / nrow(participant_summary)) 
+  summarise(
+    count = n(),
+    proportion = count / n()
+  )
 
 print(intended_vote_distribution)
 
-#for wave t1
+# For wave t1
 summary_stats_t1 <- participant_summary_t1 %>%
-  summarise(mean_proportion_econ = mean(proportion_econ, na.rm = TRUE),
-            median_proportion_econ = median(proportion_econ, na.rm = TRUE),
-            sd_proportion_econ = sd(proportion_econ, na.rm = TRUE),
-            mean_proportion_env = mean(proportion_env, na.rm = TRUE),
-            median_proportion_env = median(proportion_env, na.rm = TRUE),
-            sd_proportion_env = sd(proportion_env, na.rm = TRUE))
+  group_by(intendedVote) %>%
+  summarise(
+    mean_proportion_econ = mean(proportion_econ, na.rm = TRUE),
+    sd_proportion_econ = sd(proportion_econ, na.rm = TRUE),
+    mean_proportion_env = mean(proportion_env, na.rm = TRUE),
+    sd_proportion_env = sd(proportion_env, na.rm = TRUE)
+  )
 
 print(summary_stats_t1)
 
 intended_vote_distribution_t1 <- participant_summary_t1 %>%
   group_by(intendedVote) %>%
-  summarise(count = n(),
-            proportion = count / nrow(participant_summary)) 
+  summarise(
+    count = n(),
+    proportion = count / n()
+  )
 
 print(intended_vote_distribution_t1)
 
-#For wave t2
+# For wave t2
 summary_stats_t2 <- participant_summary_t2 %>%
-  summarise(mean_proportion_econ = mean(proportion_econ, na.rm = TRUE),
-            median_proportion_econ = median(proportion_econ, na.rm = TRUE),
-            sd_proportion_econ = sd(proportion_econ, na.rm = TRUE),
-            mean_proportion_env = mean(proportion_env, na.rm = TRUE),
-            median_proportion_env = median(proportion_env, na.rm = TRUE),
-            sd_proportion_env = sd(proportion_env, na.rm = TRUE))
+  group_by(intendedVote) %>%
+  summarise(
+    mean_proportion_econ = mean(proportion_econ, na.rm = TRUE),
+    sd_proportion_econ = sd(proportion_econ, na.rm = TRUE),
+    mean_proportion_env = mean(proportion_env, na.rm = TRUE),
+    sd_proportion_env = sd(proportion_env, na.rm = TRUE)
+  )
 
 print(summary_stats_t2)
 
-# For wave t2
 intended_vote_distribution_t2 <- participant_summary_t2 %>%
   group_by(intendedVote) %>%
-  summarise(count = n(),
-            proportion = count / nrow(participant_summary)) 
+  summarise(
+    count = n(),
+    proportion = count / n()
+  )
 
 print(intended_vote_distribution_t2)
+
 ```
 
 ```{r}

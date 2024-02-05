@@ -233,61 +233,180 @@ embedding_no <- readRDS(here::here("data","embedding_no.rds"))
 ```
 
 ```{r}
+#Assign codes to category and create new column
+# For reason_counts_no
+reason_counts_no$category <- with(reason_counts_no, case_when(
+  reason_code %in% c(36, 56, 32, 33, 39, 30, 22, 51, 37, 38, 34) ~ 1,
+  reason_code %in% c(25, 14, 54, 24, 57, 50, 59, 53) ~ 2,
+  reason_code %in% c(44, 17, 42, 26, 21, 52, 55, 35) ~ 3,
+  reason_code %in% c(27, 31, 37, 16, 20, 29, 41, 92, 95, 93) ~ 4,
+  reason_code %in% c(13, 43, 23, 96) ~ 5,
+  TRUE ~ NA_integer_
+))
+
+# For reason_counts_yes
+reason_counts_yes$category <- with(reason_counts_yes, case_when(
+  reason_code %in% c(43, 42, 40, 41, 51, 23, 53, 46, 15, 49) ~ 1,
+  reason_code %in% c(35, 36, 30, 31, 39, 34) ~ 2,
+  reason_code %in% c(55, 22, 29, 20, 92, 93, 95) ~ 3,
+  reason_code %in% c(52, 50, 14, 16, 94, 96) ~ 4,
+  reason_code %in% c(47, 54, 33, 44, 32) ~ 5,
+  reason_code %in% c(45, 25, 26, 24, 21, 37, 17) ~ 6,
+  TRUE ~ NA_integer_
+))
+
+#Assign group labels
+reason_counts_yes <- reason_counts_yes %>%
+  mutate(category_label = case_when(
+    category == 1 ~ "Umwelt- und Klimaschutz",
+    category == 2 ~ "Wirtschaftliche Beweggründe",
+    category == 3 ~ "Politische Beweggründe",
+    category == 4 ~ "Soziale und persönliche Motivationen",
+    category == 5 ~ "Konkrete Massnahmen und Technologische Innovationen",
+    category == 6 ~ "Dringlichkeit und Handlungsaufforderung",
+    TRUE ~ NA_character_  # Handles any other case
+  ))
+
+reason_counts_no <- reason_counts_no %>%
+  mutate(category_label = case_when(
+    category == 1 ~ "Wirtschaftliche und finanzielle Bedenken",
+    category == 2 ~ "Gesellschaftliche und soziale Bedenken",
+    category == 3 ~ "Skepsis gegenüber der Effektivität und Umsetzung",
+    category == 4 ~ "Politische und ideologische Gründe",
+    category == 5 ~ "Persönliche Überzeugungen und Einstellungen",
+    TRUE ~ NA_character_  # Handles any other case
+  ))
+```
+
+```{r}
+#Find codes that were not assigned a category
+# For reason_counts_no
+na_category_codes_no <- reason_counts_no %>%
+  filter(is.na(category))
+  
+
+# For reason_counts_yes
+na_category_codes_yes <- reason_counts_yes %>%
+  filter(is.na(category))
+  
+
+# Display the results
+print("NA Category Reason Codes in reason_counts_no:")
+print(na_category_codes_no)
+
+print("NA Category Reason Codes in reason_counts_yes:")
+print(na_category_codes_yes)
+
+#Umwelt & Anderes zu Umwelt missing from reasons against
+```
+```{r}
+# Update category for reason_code 40 and 49 in reason_counts_no according to ChatGPT
+reason_counts_no <- reason_counts_no %>%
+  mutate(category = case_when(
+    reason_code %in% c(40, 49) ~ 3,
+    TRUE ~ category
+  )) %>%
+  mutate(category_label = case_when(
+    category == 1 ~ "Wirtschaftliche und finanzielle Bedenken",
+    category == 2 ~ "Gesellschaftliche und soziale Bedenken",
+    category == 3 ~ "Skepsis gegenüber der Effektivität und Umsetzung",
+    category == 4 ~ "Politische und ideologische Gründe",
+    category == 5 ~ "Persönliche Überzeugungen und Einstellungen",
+    TRUE ~ NA_character_  
+  ))
+```
+
+
+
+```{r}
+#Count frequencies of categories
+# Summing for reason_counts_no
+sums_no <- reason_counts_no %>%
+  group_by(category) %>%
+  summarize(total_n = sum(n, na.rm = TRUE))%>%
+  arrange(desc(total_n))
+
+# Summing for reason_counts_yes
+sums_yes <- reason_counts_yes %>%
+  group_by(category) %>%
+  summarize(total_n = sum(n, na.rm = TRUE))%>%
+  arrange(desc(total_n))
+
+# Display the results
+print(sums_no)
+print(sums_yes)
+
+#Reasons against
+#1 = Wirtschaftliche und finanzielle Bedenken
+#2 = Skepsis gegenüber der Effektivität und Umsetzung
+#3 = Politische und ideologische Gründe
+#4 = Gesellschaftliche und soziale Bedenken
+#5 = Persönliche Überzeugungen und Einstellungen
+
+#Reasons for
+#1 = Umwelt- und Klimaschutz
+#2 = Dringlichkeit und Handlungsaufforderung
+#3 = Wirtschaftliche Beweggründe
+#4 = Konkrete Massnahmen und Technologische Innovationen
+#5 = Politische Beweggründe
+#6 = Soziale und persönliche Motivationen
+```
+```{r,eval=F, echo=F}
 #group embeddings yes
-set.seed(26)
+#set.seed(26)
 
-result_yes2b = embedding_yes %>%
+#result_yes2b = embedding_yes %>%
 
   # group similar texts
-  er_group(method = "fuzzy",threshold = 0.9) %>%
+  #er_group(method = "fuzzy",threshold = 0.9) %>%
 
   # generate 2D projection
-  er_project(method = "umap") %>%
+  #er_project(method = "umap") %>%
 
   # cluster projection
-  er_cluster(method = "louvain",resolution = 1.15) %>%
+  #er_cluster(method = "louvain",resolution = 1.15) %>%
 
   # produce data frame
-  er_frame()
+  #er_frame()
 
 #save result as rds
-saveRDS(result_yes2b,here::here("data","result_yes2b.rds"))
+#saveRDS(result_yes2b,here::here("data","result_yes2b.rds"))
 ```
 
-```{r}
+```{r,eval=F, echo=F}
 #group embeddings no
-set.seed(26)
+#set.seed(26)
 
-result_no2b = embedding_no %>%
+#result_no2b = embedding_no %>%
 
   # group similar texts
-  er_group(method = "fuzzy",threshold = 0.9) %>%
+  #er_group(method = "fuzzy",threshold = 0.9) %>%
 
   # generate 2D projection
-  er_project(method = "umap") %>%
+  #er_project(method = "umap") %>%
 
   # cluster projection
-  er_cluster(method = "louvain",resolution = 1.15) %>%
+  #er_cluster(method = "louvain",resolution = 1.15) %>%
 
   # produce data frame
-  er_frame()
+  #er_frame()
 
 #save result as rds
-saveRDS(result_no2b,here::here("data","result_no2b.rds"))
+#saveRDS(result_no2b,here::here("data","result_no2b.rds"))
 ```
 
-```{r}
+```{r,eval=F, echo=F}
 #load results as rds
-result_yes2 <- readRDS(here::here("data","result_yes2.rds"))
-result_no2 <- readRDS(here::here("data","result_no2.rds"))
+#result_yes2 <- readRDS(here::here("data","result_yes2.rds"))
+#result_no2 <- readRDS(here::here("data","result_no2.rds"))
 ```
 
-```{r}
-result_yes2b$group_texts <- sapply(result_yes2b$group_texts, toString)
-write_xlsx(result_yes2b, here::here("data","result_yes2b.xlsx"))
+```{r,eval=F, echo=F}
+#result_yes2b$group_texts <- sapply(result_yes2b$group_texts, toString)
+#write_xlsx(result_yes2b, here::here("data","result_yes2b.xlsx"))
 
-result_no2b$group_texts <- sapply(result_no2b$group_texts, toString)
-write_xlsx(result_no2b, here::here("data","result_no2b.xlsx"))
+#result_no2b$group_texts <- sapply(result_no2b$group_texts, toString)
+#write_xlsx(result_no2b, here::here("data","result_no2b.xlsx"))
 ```
 
 
