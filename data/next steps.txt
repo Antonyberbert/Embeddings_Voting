@@ -1,0 +1,2 @@
+1)Ratio statt binär (pro Person, wie oft env / econ erwähnt / gesamt pro person)
+2)frequency table: econ / env oder beide erwähnt für ja / nein
