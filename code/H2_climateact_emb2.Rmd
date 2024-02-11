@@ -1,0 +1,309 @@
+---
+title: "H2_climateact_emb2"
+output: html_document
+date: "2024-01-24"
+---
+
+```{r}
+#Install and load necessary packages
+packages <- c("devtools","here","dplyr","tidyverse","readxl","writexl","hunspell","text2vec","car","broom","lme4","gridExtra")
+for (package in packages) {
+  if (!requireNamespace(package, quietly = TRUE)) {
+    install.packages(package)
+  }
+}
+lapply(packages,library, character.only=T)
+```
+
+```{r}
+#Install and load embedR
+if (!requireNamespace("embedR", quietly = TRUE)) {
+    # If not installed, install it using devtools
+    devtools::install_github("dwulff/embedR")
+}
+
+library("embedR")
+```
+
+```{r}
+#read in final dataset
+energyact_fin <- read_xlsx(here::here("data","energyact_final.xlsx"))
+
+#load embeddings as R object
+embedding <- readRDS(here::here("data","embedding.rds"))
+```
+
+```{r,echo=F, eval=F}
+#embed chatGPT lists yes-voters
+#1 Umwelt- und Klimaschutz
+#embedR::er_set_tokens("cohere" = "x","huggingface"="x","openai" = "x")
+
+#emb_yes_env = er_embed(c("Umwelt","Klimawandel","Nachhaltigkeit","Ökosystem","Biodiversität","Emissionen","Treibhausgase","Erneuerbare Energie","Ressourcenschonung","Klimaneutralität"),api="cohere",model="embed-multilingual-v3.0")
+
+#2 Dringlichkeit und Handlungsaufforderung
+#emb_yes_urg = er_embed(c("Dringlich","Handeln","Sofortmassnahmen","Frist","Notfall","Aktivismus","Mobilisierung","Engagement","Verantwortung","Initiative"),api="cohere",model="embed-multilingual-v3.0")
+
+#3 Wirtschaftliche Beweggründe
+#emb_yes_econ = er_embed(c("Wirtschaftswachstum","Kosten","Investition","Wettbewerbsfähigkeit","Arbeitsplätze","Innovation","Marktchancen","Energiekosten","Subventionen","Finanzierung"),api="cohere",model="embed-multilingual-v3.0")
+
+#4 Konkrete Massnahmen und Technologische Innovationen
+#emb_yes_tec = er_embed(c("Energiewende","Solarenergie","Windkraft","Elektromobilität","CO2-Steuer","Recycling","Wassermanagement","Smart Grids","Nachhaltige Landwirtschaft","Grüne Technologien"),api="cohere",model="embed-multilingual-v3.0")
+
+#5 Politische Beweggründe
+#emb_yes_pol = er_embed(c("Gesetzgebung","Klimaabkommen","Politische Führung","Parteipolitik","Wählerwillen","Regulierung","Internationale Zusammenarbeit","Umweltpolitik","Lobbyismus","Bürgerinitiativen"),api="cohere",model="embed-multilingual-v3.0")
+
+#6 Soziale und persönliche Motivationen
+#emb_yes_soc = er_embed(c("Gemeinwohl","Generationengerechtigkeit","Lebensqualität","Gesundheit","Bildung","Bewusstsein","Persönliche Verantwortung","Soziales Engagement","Kultureller Wandel","Öffentliche Meinung"),api="cohere",model="embed-multilingual-v3.0")
+```
+
+```{r,eval=F, echo=F}
+#embed chatGPT lists no-voters
+
+#1 Wirtschaftliche und finanzielle Bedenken
+#emb_no_econ = er_embed(c("Kosten","Steuern","Wirtschaftsschaden","Finanzierung","Budgetdefizit","Investitionsrisiko","Wettbewerbsnachteil","Arbeitsplatzverlust","Teuerung","Wirtschaftskrise"),api="cohere",model="embed-multilingual-v3.0")
+
+#2 Skepsis gegenüber der Effektivität und Umsetzung
+#emb_no_ske = er_embed(c("Umsetzbarkeit","Effizienz","Technische Machbarkeit","Langzeitwirkung","Nebenwirkungen","Kosten-Nutzen-Verhältnis","Überregulierung","Realisierbarkeit","Wissenschaftliche Unsicherheit","Komplexität"),api="cohere",model="embed-multilingual-v3.0")
+
+#3 Politische und ideologische Gründe
+#emb_no_pol = er_embed(c("Freiheitseinschränkung","Staatseingriff","Parteipolitik","Regierungsversagen","Ideologie","Machtmissbrauch","Politische Agenda","Souveränität","Zentralisierung","Bürgerrechte"),api="cohere",model="embed-multilingual-v3.0")
+
+#4 Gesellschaftliche und soziale Bedenken
+#emb_no_soc = er_embed(c("Soziale Gerechtigkeit","Gemeinschaftsschaden","Tradition","Kulturelle Identität","Sozialer Wandel","Öffentliche Meinung","Demographischer Wandel","Bildungsniveau","Soziale Spaltung","Integration"),api="cohere",model="embed-multilingual-v3.0")
+
+#5 Persönliche Überzeugungen und Einstellungen
+#emb_no_per = er_embed(c("Skeptizismus","Pessimismus","Individualismus","Pragmatismus","Risikoaversion","Verantwortungsablehnung","Autonomie","Lebensstil","Glaube","Persönliche Freiheit"),api="cohere",model="embed-multilingual-v3.0")
+```
+
+```{r,echo=F, eval=F}
+#save embeddings as R object
+#saveRDS(emb_yes_env, here::here("data", "emb_yes_env.rds"))
+#saveRDS(emb_yes_urg, here::here("data", "emb_yes_urg.rds"))
+#saveRDS(emb_yes_econ, here::here("data", "emb_yes_econ.rds"))
+#saveRDS(emb_yes_tec, here::here("data", "emb_yes_tec.rds"))
+#saveRDS(emb_yes_pol, here::here("data", "emb_yes_pol.rds"))
+#saveRDS(emb_yes_soc, here::here("data", "emb_yes_soc.rds"))
+#saveRDS(emb_no_econ, here::here("data", "emb_no_econ.rds"))
+#saveRDS(emb_no_ske, here::here("data", "emb_no_ske.rds"))
+#saveRDS(emb_no_pol, here::here("data", "emb_no_pol.rds"))
+#saveRDS(emb_no_soc, here::here("data", "emb_no_soc.rds"))
+#saveRDS(emb_no_per, here::here("data", "emb_no_per.rds"))
+```
+
+```{r}
+#Load embeddings
+emb_list <- list(
+  emb_yes_env = readRDS(here::here("data", "emb_yes_env.rds")),
+  emb_yes_urg = readRDS(here::here("data", "emb_yes_urg.rds")),
+  emb_yes_econ = readRDS(here::here("data", "emb_yes_econ.rds")),
+  emb_yes_tec = readRDS(here::here("data", "emb_yes_tec.rds")),
+  emb_yes_pol = readRDS(here::here("data", "emb_yes_pol.rds")),
+  emb_yes_soc = readRDS(here::here("data", "emb_yes_soc.rds")),
+  emb_no_econ = readRDS(here::here("data", "emb_no_econ.rds")),
+  emb_no_ske = readRDS(here::here("data", "emb_no_ske.rds")),
+  emb_no_pol = readRDS(here::here("data", "emb_no_pol.rds")),
+  emb_no_soc = readRDS(here::here("data", "emb_no_soc.rds")),
+  emb_no_per = readRDS(here::here("data", "emb_no_per.rds"))
+)
+```
+
+```{r}
+calculate_max_similarity <- function(embedding_study, embedding_list) {
+  # Calculate cosine similarity
+  similarity_matrix <- sim2(embedding_study, embedding_list, method = "cosine")
+  # Get the maximum similarity score for each word
+  max_similarity <- apply(similarity_matrix, 1, max)
+  return(max_similarity)
+}
+
+# Calculating max similarity for each embedding
+for (name in names(emb_list)) {
+  energyact_fin[[paste0("max_similarity_", name)]] <- calculate_max_similarity(embedding, emb_list[[name]])
+}
+```
+
+```{r}
+# Adjust the function to not print but return the plot object
+create_similarity_plot <- function(data, similarity_var, title_suffix) {
+  if(!similarity_var %in% names(data)) {
+    stop(paste("The specified similarity variable", similarity_var, "does not exist in the dataframe."))
+  }
+  ordered_data <- data %>% arrange(desc(.data[[similarity_var]]))
+  median_similarity <- median(ordered_data[[similarity_var]], na.rm = TRUE)
+  
+  plot <- ggplot(ordered_data, aes(x = reorder(row.names(ordered_data), -.data[[similarity_var]]), y = .data[[similarity_var]])) +
+    geom_hline(yintercept = median_similarity, linetype = "dashed", color = "blue") +
+    geom_point() +
+    labs(x = "Words", y = paste("Max Similarity to", title_suffix), title = paste("Similarity Scores for", title_suffix)) +
+    scale_y_continuous(breaks = seq(0, 1, by = 0.05)) +
+    theme_classic() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+  
+  return(plot)
+}
+
+# Create plots for each category
+plots_first_grid <- lapply(c("max_similarity_emb_yes_env", "max_similarity_emb_yes_urg", "max_similarity_emb_yes_econ", "max_similarity_emb_yes_tec", "max_similarity_emb_yes_pol", "max_similarity_emb_yes_soc"), function(var) {
+  create_similarity_plot(energyact_fin, var, sub("max_similarity_", "", var))
+})
+
+plots_second_grid <- lapply(c("max_similarity_emb_no_econ", "max_similarity_emb_no_ske", "max_similarity_emb_no_pol", "max_similarity_emb_no_soc", "max_similarity_emb_no_per"), function(var) {
+  create_similarity_plot(energyact_fin, var, sub("max_similarity_", "", var))
+})
+
+# Arrange plots in two grids
+grid_1 <- do.call(grid.arrange, c(plots_first_grid, ncol = 3))
+grid_2 <- do.call(grid.arrange, c(plots_second_grid, ncol = 3))
+
+# Save the grids to PNG files
+ggsave("similarity_plots_grid_1.png", grid_1, width = 16, height = 12)
+ggsave("similarity_plots_grid_2.png", grid_2, width = 16, height = 12)
+```
+```{r}
+# Assuming energyact_fin is your original dataset
+energyact_fin_long <- energyact_fin %>%
+  pivot_longer(cols = starts_with("max_similarity_"),
+               names_to = "category",
+               values_to = "similarity") %>%
+  mutate(category = sub("max_similarity_", "", category))
+
+medians_by_vote_wave <- energyact_fin_long %>%
+  group_by(category, intendedVote, wave) %>%
+  summarize(median_similarity = median(similarity, na.rm = TRUE), .groups = 'drop')
+
+
+plot1 <- ggplot(energyact_fin_long, aes(x = reorder(word, -similarity), y = similarity, color = category)) +
+  geom_point() +
+  geom_hline(data = medians_by_vote_wave %>% filter(wave %in% c("t1", "t2")), aes(yintercept = median_similarity, color = category), linetype = "dashed") +
+  facet_wrap(~intendedVote) +
+  theme_minimal() +
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) +
+  labs(x = "Words", y = "Max Similarity Score", title = "Distribution of Similarity Scores by Intended Vote") +
+  scale_y_continuous(breaks = seq(0, 1, by = 0.05))
+
+print(plot1)
+```
+
+```{r}
+# Plot 2 as per the original request, now adjusted for both intendedVote and wave
+plot2 <- ggplot(energyact_fin_long, aes(x = reorder(word, -similarity), y = similarity, color = category)) +
+  geom_point() +
+  geom_hline(data = medians_by_vote_wave, aes(yintercept = median_similarity, color = category), linetype = "dashed") +
+  facet_grid(wave ~ intendedVote) +
+  theme_minimal() +
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) +
+  labs(x = "Words", y = "Max Similarity Score", title = "Distribution of Similarity Scores by Intended Vote and Wave") +
+  scale_y_continuous(breaks = seq(0, 1, by = 0.05))
+
+print(plot2)
+
+```
+```{r}
+# Assuming energyact_fin_long and medians_by_vote are already prepared
+# Calculate median similarity scores for each category by intendedVote
+medians_by_vote <- energyact_fin_long %>%
+  group_by(category, intendedVote) %>%
+  summarize(median_similarity = median(similarity, na.rm = TRUE)) %>%
+  ungroup()
+
+# Define the categories for each grid
+grid1_categories <- c("max_similarity_emb_yes_env", "max_similarity_emb_yes_urg", "max_similarity_emb_yes_econ", "max_similarity_emb_yes_tec", "max_similarity_emb_yes_pol", "max_similarity_emb_yes_soc")
+grid2_categories <- c("max_similarity_emb_no_econ", "max_similarity_emb_no_ske", "max_similarity_emb_no_pol", "max_similarity_emb_no_soc", "max_similarity_emb_no_per")
+
+# Create plots for each category
+create_plot_for_category <- function(category) {
+  current_data <- subset(energyact_fin_long, category == category)
+  current_medians <- subset(medians_by_vote, category == category)
+  
+  plot <- ggplot(current_data, aes(x = reorder(word, -similarity), y = similarity)) +
+    geom_point() +
+    geom_hline(data = current_medians, aes(yintercept = median_similarity), linetype = "dashed") +
+    facet_wrap(~ intendedVote) +
+    theme_minimal() +
+    theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) +
+    labs(x = "Words", y = "Max Similarity Score", title = paste(category, "Similarity Scores by Intended Vote")) +
+    scale_y_continuous(breaks = seq(0, 1, by = 0.05))
+  
+  return(plot)
+}
+
+# Create plots for each category in each grid
+plots_grid1 <- lapply(grid1_categories, create_plot_for_category)
+plots_grid2 <- lapply(grid2_categories, create_plot_for_category)
+
+# Arrange the plots into two grids
+grid1 <- do.call(grid.arrange, c(plots_grid1, ncol = 3))
+grid2 <- do.call(grid.arrange, c(plots_grid2, ncol = 3))
+
+# Save the grids to PNG files
+ggsave("similarity_plots_grid1.png", grid1, width = 20, height = 10)
+ggsave("similarity_plots_grid2.png", grid2, width = 20, height = 10)
+```
+```{r}
+# Assuming energyact_fin_long and medians_by_vote are already prepared
+# Calculate median similarity scores for each category by intendedVote
+medians_by_vote <- energyact_fin_long %>%
+  group_by(category, intendedVote) %>%
+  summarize(median_similarity = median(similarity, na.rm = TRUE)) %>%
+  ungroup()
+
+# Define the categories for each grid
+grid1_categories <- c("max_similarity_emb_yes_env", "max_similarity_emb_yes_urg", "max_similarity_emb_yes_econ", "max_similarity_emb_yes_tec", "max_similarity_emb_yes_pol", "max_similarity_emb_yes_soc")
+grid2_categories <- c("max_similarity_emb_no_econ", "max_similarity_emb_no_ske", "max_similarity_emb_no_pol", "max_similarity_emb_no_soc", "max_similarity_emb_no_per")
+
+# Define a color palette with distinct colors for each category
+color_palette <- c("max_similarity_emb_yes_env" = "#1f77b4", 
+                   "max_similarity_emb_yes_urg" = "#ff7f0e", 
+                   "max_similarity_emb_yes_econ" = "#2ca02c", 
+                   "max_similarity_emb_yes_tec" = "#d62728", 
+                   "max_similarity_emb_yes_pol" = "#9467bd", 
+                   "max_similarity_emb_yes_soc" = "#8c564b", 
+                   "max_similarity_emb_no_econ" = "#e377c2", 
+                   "max_similarity_emb_no_ske" = "#7f7f7f", 
+                   "max_similarity_emb_no_pol" = "#bcbd22", 
+                   "max_similarity_emb_no_soc" = "#17becf",
+                   "max_similarity_emb_no_per" = "#9edae5")
+
+create_plot_for_category <- function(category) {
+  current_data <- subset(energyact_fin_long, category == category)
+  current_medians <- subset(medians_by_vote, category == category)
+  
+  # Directly specify color based on the category
+  plot_color <- color_palette[category]
+  
+  plot <- ggplot(current_data, aes(x = reorder(word, -similarity), y = similarity)) +  # Remove color from here
+    geom_point(color = plot_color) +  # Apply color directly
+    geom_hline(data = current_medians, aes(yintercept = median_similarity), linetype = "dashed", color = plot_color) +  # Apply color directly
+    facet_wrap(~ intendedVote) +
+    theme_minimal() +
+    theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.position = "none") +
+    labs(x = "Words", y = "Max Similarity Score", title = paste(sub("max_similarity_", "", category), "Similarity Scores by Intended Vote")) +
+    scale_y_continuous(breaks = seq(0, 1, by = 0.05))
+  
+  return(plot)
+}
+
+# Create plots for each category in each grid
+plots_grid1 <- lapply(grid1_categories, create_plot_for_category)
+plots_grid2 <- lapply(grid2_categories, create_plot_for_category)
+
+# Arrange the plots into two grids
+grid1 <- do.call(grid.arrange, c(plots_grid1, ncol = 3))
+grid2 <- do.call(grid.arrange, c(plots_grid2, ncol = 3))
+
+# Save the grids to PNG files
+ggsave("similarity_plots_grid1.png", grid1, width = 20, height = 10)
+ggsave("similarity_plots_grid2.png", grid2, width = 20, height = 10)
+
+```
+
+```{r}
+#Factorize intended Vote
+energyact_fin$fintendedVote <- factor(energyact_fin$intendedVote, levels = c(0, 1))
+
+model <- glmer(intendedVote ~ max_similarity_emb_yes_env + max_similarity_emb_yes_urg + max_similarity_emb_yes_econ + max_similarity_emb_yes_tec + max_similarity_emb_yes_pol + max_similarity_emb_yes_soc + max_similarity_emb_no_econ + max_similarity_emb_no_ske + max_similarity_emb_no_pol + max_similarity_emb_no_soc + max_similarity_emb_no_per + (1 | participantID), data = energyact_fin, family = binomial, control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000)))
+
+# Summary of the model
+summary(model)
+
+```

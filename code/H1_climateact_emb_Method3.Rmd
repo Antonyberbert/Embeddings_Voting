@@ -1,0 +1,546 @@
+---
+title: "H1_energyact emb3"
+output:
+  html_document: default
+  pdf_document: default
+date: "Sys.Date()"
+---
+#Todo: Create plots and logistic regression with wave variable
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#Install and load necessary packages
+packages <- c("devtools","here","dplyr","tidyverse","readxl","writexl","hunspell","text2vec","car","broom","lme4","RColorBrewer")
+for (package in packages) {
+  if (!requireNamespace(package, quietly = TRUE)) {
+    install.packages(package)
+  }
+}
+lapply(packages,library, character.only=T)
+```
+
+```{r}
+#Install and load embedR
+if (!requireNamespace("embedR", quietly = TRUE)) {
+    # If not installed, install it using devtools
+    devtools::install_github("dwulff/embedR")
+}
+
+library("embedR")
+```
+
+```{r}
+#read in final dataset
+energyact_fin <- read_xlsx(here::here("data","energyact_final.xlsx"))
+
+#read in matching dataset
+matchids <- read.csv(here::here("data","Match_participantID.csv"),sep = ";")
+matchids2 <- matchids %>% select(participantID.wave1,participantID.wave2)
+
+# Select unique rows
+matchids2 <- unique(matchids2)
+
+#load embeddings as R object
+embedding <- readRDS(here::here("data","embedding.rds"))
+```
+
+```{r,eval=F, echo=F}
+#embed chatGPT list
+#economy words
+#embedR::er_set_tokens("cohere" = "x","huggingface"="x","openai" = "x")
+
+#embedding_econ = er_embed(c("kosten","teuer","preis","arbeit","investition","wirtschaft","finanzierung","budget","ausgaben","steuern","subvention","gewinn","verlust","rendite","sparen","wettbewerb","verschuldung","einkommen","umsatz","markt"),api="cohere",model="embed-multilingual-v3.0")
+
+#environmental prot words
+#embedding_env = er_embed(c("umweltschutz","klimaschutz","dringend","notwendig","nachhaltigkeit","erneuerbar","ökologie","biodiversität","artenschutz","ressourcenschonung","emission","klimawandel","ökosystem","umweltbewusstsein","grüne energie","verschmutzung","zeitdruck","landschaftsschutz","naturschutz","tierschutz"),api="cohere",model="embed-multilingual-v3.0")
+```
+
+```{r,eval=F, echo=F}
+#save embeddings as R object
+#saveRDS(embedding_econ, here::here("data","embedding_econ.rds"))
+
+#saveRDS(embedding_env, here::here("data","embedding_env.rds"))
+```
+
+```{r}
+#Remove t1 and t2 from ID
+energyact_fin <- energyact_fin %>%
+  mutate(participantID = gsub("_t[1|2]$", "", participantID))
+```
+
+```{r}
+# 2. Merge energyact_fin with matchids2 based on participantID of wave 1
+# This will add the participantID.wave2 column to your energyact_fin dataframe for matching rows
+energyact_fin <- energyact_fin %>%
+  left_join(matchids2, by = c("participantID" = "participantID.wave1"))
+
+# 3. Update the participantID for wave 1 participants with their corresponding wave 2 IDs
+energyact_fin <- energyact_fin %>%
+  mutate(participantID = if_else(wave == "t1" & !is.na(participantID.wave2), participantID.wave2, participantID))
+
+# 4. Optionally, remove the temporary columns added during the merge
+energyact_fin$participantID.wave1 <- NULL
+energyact_fin$participantID.wave2 <- NULL
+
+# Count the unique participantIDs in the dataframe
+number_of_unique_ids <- energyact_fin %>% 
+  summarise(unique_ids = n_distinct(participantID)) %>%
+  pull(unique_ids)
+
+# Print the number of unique participantIDs
+print(number_of_unique_ids)
+```
+
+```{r}
+set.seed(26)
+
+calculate_max_similarity <- function(embedding_study, embedding_list) {
+  # Calculate cosine similarity
+  similarity_matrix <- sim2(embedding_study, embedding_list, method = "cosine")
+  # Get the maximum similarity score for each word
+  max_similarity <- apply(similarity_matrix, 1, max)
+  return(max_similarity)
+}
+```
+
+```{r}
+#Load embeddings
+embedding_econ <- readRDS(here::here("data","embedding_econ.rds"))
+
+embedding_env <- readRDS(here::here("data","embedding_env.rds"))
+# Creating a dataframe from the study embedding matrix
+H1_df <- as.data.frame(embedding)
+
+# Save the rownames as the first column in H1_df
+H1_df$word <- rownames(H1_df)
+
+# Reset the rownames of H1_df
+rownames(H1_df) <- NULL
+
+
+
+# Calculate max similarities
+H1_df$max_similarity_econ <- calculate_max_similarity(embedding, embedding_econ)
+H1_df$max_similarity_env <- calculate_max_similarity(embedding, embedding_env)
+```
+
+```{r}
+#add similarity columns to energyact_fin
+# Get the names of the last two columns
+last_two_columns <- names(H1_df)[(ncol(H1_df)-1):ncol(H1_df)]
+
+# Add the last two columns from H1_df to energyact_fin
+energyact_fin[last_two_columns] <- H1_df[last_two_columns]
+```
+
+```{r}
+energyact_fin <- energyact_fin %>%
+  mutate(category = case_when(
+    max_similarity_econ >= 0.6 & max_similarity_econ > max_similarity_env ~ "econ",
+    max_similarity_env >= 0.6 & max_similarity_env > max_similarity_econ ~ "env",
+    TRUE ~ "rest"
+  ))
+```
+
+```{r}
+# Assuming your original dataframe is named energyact_fin
+# First, identify participants present in both waves
+participants_in_both_waves <- energyact_fin %>%
+  group_by(participantID) %>%
+  filter(all(c("t1", "t2") %in% wave)) %>%
+  ungroup() %>%
+  select(participantID) %>%
+  distinct()
+
+# Now, filter the original dataframe to include only those participants
+energyact_fin_both <- energyact_fin %>%
+  semi_join(participants_in_both_waves, by = "participantID")
+
+# Check the structure of the new dataframe
+str(energyact_fin_both)
+```
+
+```{r}
+# Calculate the count of each category per participant
+category_counts <- energyact_fin_both %>%
+  group_by(participantID, category) %>%
+  summarise(count = n(), .groups = 'drop')
+
+# Calculate the total entries per participant
+total_counts <- energyact_fin_both %>%
+  group_by(participantID) %>%
+  summarise(total = n(), .groups = 'drop')
+
+# Merge and calculate proportions
+proportions_df <- left_join(category_counts, total_counts, by = "participantID") %>%
+  mutate(proportion = count / total) %>%
+  select(participantID, category, proportion)
+
+# Pivot wider to have separate columns for each category
+proportions_across <- proportions_df %>%
+  pivot_wider(names_from = category, values_from = proportion, values_fill = list(proportion = 0))
+```
+
+```{r}
+#!!!!!!!!!!!!!!!!!!!!!!!!!!
+#Some participants changed their vote from t1 to t2. How should we consider this in the analysis?
+#This means, that when analysing changes across both time points, we have more rows than participants (293 instead of 254). Here I calculated the analses with 293 rows.
+
+# Join the proportions with intendedVote
+energyact_fin_summary <- energyact_fin_both %>%
+  select(participantID, intendedVote) %>%
+  distinct() %>%
+  left_join(proportions_across, by = "participantID")
+
+# Calculate mean and SD of proportions by intendedVote
+descriptive_stats <- energyact_fin_summary %>%
+  group_by(intendedVote) %>%
+  summarise(across(c(econ, env, rest), list(mean = ~mean(., na.rm = TRUE), sd = ~sd(., na.rm = TRUE))))
+
+print(descriptive_stats)
+```
+```{r}
+#Calculating overall descriptive stats with only participants with consistent votes
+
+# Create a summary of votes by participant and wave
+votes_summary <- energyact_fin_both %>%
+  group_by(participantID, wave) %>%
+  summarise(intendedVote = unique(intendedVote), .groups = 'drop') %>%
+  pivot_wider(names_from = wave, values_from = intendedVote, names_prefix = "vote_")
+
+# Identify participants with the same vote in t1 and t2
+consistent_vote_participants <- votes_summary %>%
+  filter(vote_t1 == vote_t2) %>%
+  select(participantID)
+
+# Filter to keep only participants with consistent votes
+energyact_fin_consistent <- energyact_fin_both %>%
+  semi_join(consistent_vote_participants, by = "participantID")
+
+# Calculate category counts and total counts as before
+category_counts_cons <- energyact_fin_consistent %>%
+  group_by(participantID, category) %>%
+  summarise(count = n(), .groups = 'drop')
+
+total_counts_cons <- energyact_fin_consistent %>%
+  group_by(participantID) %>%
+  summarise(total = n(), .groups = 'drop')
+
+# Merge, calculate proportions, and pivot wider
+proportions_cons <- left_join(category_counts_cons, total_counts_cons, by = "participantID") %>%
+  mutate(proportion = count / total) %>%
+  select(participantID, category, proportion)
+
+proportions_wide_cons <- proportions_cons %>%
+  pivot_wider(names_from = category, values_from = proportion, values_fill = list(proportion = 0))
+
+# Join with intendedVote and calculate descriptive statistics
+energyact_fin_summary_cons <- energyact_fin_consistent %>%
+  select(participantID, intendedVote) %>%
+  distinct() %>%
+  left_join(proportions_wide, by = "participantID")
+
+descriptive_stats_cons <- energyact_fin_summary_cons %>%
+  group_by(intendedVote) %>%
+  summarise(across(c(econ, env, rest), list(mean = ~mean(., na.rm = TRUE), sd = ~sd(., na.rm = TRUE))))
+
+print(descriptive_stats_cons)
+```
+```{r}
+#Wilcoxon sum rank test to check if econ and env are significantly different between including all participants or only those with consistent votes
+# For the 'econ' category
+econ_diff <- wilcox.test(
+  x = energyact_fin_summary$econ,
+  y = energyact_fin_summary_cons$econ,
+  alternative = "two.sided"
+)
+
+# For the 'env' category
+env_diff <- wilcox.test(
+  x = energyact_fin_summary$env,
+  y = energyact_fin_summary_cons$env,
+  alternative = "two.sided"
+)
+
+# For the 'rest' category
+rest_diff <- wilcox.test(
+  x = energyact_fin_summary$rest,
+  y = energyact_fin_summary_cons$rest,
+  alternative = "two.sided"
+)
+
+# Print the results
+print(list(
+  econ_diff = econ_diff,
+  env_diff = env_diff,
+  rest_diff = rest_diff
+))
+
+#Not significantly different
+```
+```{r}
+# Creating df with participants that were present in both waves with proportions per category, wave, and vote
+proportions_wave <- energyact_fin_both %>%
+  group_by(participantID, wave) %>%
+  count(category) %>%
+  ungroup() %>%
+  group_by(participantID, wave) %>%
+  mutate(total = sum(n)) %>%
+  ungroup() %>%
+  mutate(proportion = n / total) %>%
+  select(participantID, wave, category, proportion)
+
+# Pivot wider to have separate columns for each category, filling missing categories with zeros
+proportions_category_separate <- proportions_wave %>%
+  pivot_wider(names_from = category, values_from = proportion, values_fill = list(proportion = 0))
+
+# Ensure joining with intendedVote to include it in the dataset
+proportions_both_vote_wave <- energyact_fin_both %>%
+  select(participantID, wave, intendedVote) %>%
+  distinct() %>%
+  left_join(proportions_category_separate, by = c("participantID", "wave"))
+```
+
+```{r}
+# Calculate mean and SD by wave
+summary_by_wave <- proportions_both_vote_wave %>%
+  group_by(wave) %>%
+  summarise(across(c(econ, env, rest), list(mean = ~mean(., na.rm = TRUE), 
+                                            sd = ~sd(., na.rm = TRUE))))
+
+print(summary_by_wave)
+```
+```{r}
+# Calculate mean and SD by wave and intendedVote
+summary_by_wave_vote <- proportions_both_vote_wave %>%
+  group_by(wave, intendedVote) %>%
+  summarise(across(c(econ, env, rest), list(mean = ~mean(., na.rm = TRUE), 
+                                            sd = ~sd(., na.rm = TRUE))))
+
+print(summary_by_wave_vote)
+```
+```{r}
+#Calculate how many participants changed their vote from t1 to t2
+# Assuming proportions_both_vote_wave is your starting dataframe
+# Filter for unique participantID-wave combinations
+votes_comparison <- proportions_both_vote_wave %>%
+  select(participantID, wave, intendedVote) %>%
+  distinct() %>%
+  pivot_wider(names_from = wave, values_from = intendedVote, names_prefix = "vote_")
+
+# Ensure we're only considering participants who have votes for both t1 and t2
+votes_comparison <- votes_comparison %>%
+  filter(!is.na(vote_t1) & !is.na(vote_t2))
+
+# Classify vote changes
+vote_changes_summary <- votes_comparison %>%
+  mutate(change_status = case_when(
+    vote_t1 == 0 & vote_t2 == 1 ~ "0 to 1",
+    vote_t1 == 1 & vote_t2 == 0 ~ "1 to 0",
+    vote_t1 == 0 & vote_t2 == 0 ~ "Stable 0",
+    vote_t1 == 1 & vote_t2 == 1 ~ "Stable 1"
+  )) %>%
+  count(change_status) %>%
+  mutate(percentage = n / sum(n) * 100)
+
+# Extend the vote_changes_summary to include broader categories
+total_vote_changes_summary <- votes_comparison %>%
+  mutate(changed = if_else(vote_t1 == vote_t2, "Not Changed", "Changed")) %>%
+  count(changed) %>%
+  mutate(percentage = n / sum(n) * 100)
+
+print(total_vote_changes_summary)
+
+print(vote_changes_summary)
+```
+
+
+```{r}
+# Checking normality for the 'econ' proportion
+shapiro.test(proportions_both_vote_wave$econ[proportions_both_vote_wave$intendedVote == 0])
+shapiro.test(proportions_both_vote_wave$econ[proportions_both_vote_wave$intendedVote == 1])
+
+shapiro.test(proportions_both_vote_wave$env[proportions_both_vote_wave$intendedVote == 0])
+shapiro.test(proportions_both_vote_wave$env[proportions_both_vote_wave$intendedVote == 1])
+```
+```{r}
+# Wilcoxon signed-rank test for econ overall
+econ_test_overall <- wilcox.test(proportions_both_vote_wave$econ[proportions_both_vote_wave$wave=="t1"], proportions_both_vote_wave$econ[proportions_both_vote_wave$wave=="t2"], paired = TRUE)
+
+env_test_overall <- wilcox.test(proportions_both_vote_wave$env[proportions_both_vote_wave$wave=="t1"], proportions_both_vote_wave$env[proportions_both_vote_wave$wave=="t2"], paired = TRUE)
+
+rest_test_overall <- wilcox.test(proportions_both_vote_wave$rest[proportions_both_vote_wave$wave=="t1"], proportions_both_vote_wave$rest[proportions_both_vote_wave$wave=="t2"], paired = TRUE)
+
+print(list(
+  econ_test_overall = econ_test_overall,
+  env_test_overall = env_test_overall,
+  rest_test_overall = rest_test_overall
+))
+
+#Econ significantly changes across voters over time
+
+wilcox_effsize(proportions_both_vote_wave, econ~wave,paired=T)
+#r=0.17
+```
+```{r}
+#For wilcoxon signed-rank test, there have to be equal number of values in t1 and t2 for separate votes, so we can only include participants that did not change their vote.
+
+#So these results are only for participants that did not change vote!
+
+# Creating df with consistent participants that were present in both waves with proportions per category, wave, and vote
+proportions_wave_cons <- energyact_fin_consistent %>%
+  group_by(participantID, wave) %>%
+  count(category) %>%
+  ungroup() %>%
+  group_by(participantID, wave) %>%
+  mutate(total = sum(n)) %>%
+  ungroup() %>%
+  mutate(proportion = n / total) %>%
+  select(participantID, wave, category, proportion)
+
+# Pivot wider to have separate columns for each category, filling missing categories with zeros
+proportions_category_separate_cons <- proportions_wave_cons %>%
+  pivot_wider(names_from = category, values_from = proportion, values_fill = list(proportion = 0))
+
+# Ensure joining with intendedVote to include it in the dataset
+proportions_both_vote_wave_cons <- energyact_fin_consistent %>%
+  select(participantID, wave, intendedVote) %>%
+  distinct() %>%
+  left_join(proportions_category_separate_cons, by = c("participantID", "wave"))
+
+# Wilcoxon signed-rank test separate for yes and no voters
+data_vote_0 <- filter(proportions_both_vote_wave_cons, intendedVote == 0)
+data_vote_1 <- filter(proportions_both_vote_wave_cons, intendedVote == 1)
+
+#Intendedvote=0
+env_test_0 <- wilcox.test(data_vote_0$env[data_vote_0$wave=="t1"], data_vote_0$env[data_vote_0$wave=="t2"], paired = TRUE)
+econ_test_0 <- wilcox.test(data_vote_0$econ[data_vote_0$wave=="t1"], data_vote_0$econ[data_vote_0$wave=="t2"], paired = TRUE)
+
+# IntendedVote = 1
+env_test_1 <- wilcox.test(data_vote_1$env[data_vote_1$wave=="t1"], data_vote_1$env[data_vote_1$wave=="t2"], paired = TRUE)
+econ_test_1 <- wilcox.test(data_vote_1$econ[data_vote_1$wave=="t1"], data_vote_1$econ[data_vote_1$wave=="t2"], paired = TRUE)
+
+print(list(
+  env_test_0 = env_test_0,
+  econ_test_0 = econ_test_0,
+  env_test_1 = env_test_1,
+  econ_test_1 = econ_test_1
+))
+
+#env & econ for no voters only significant at 0.1 level
+```
+
+```{r}
+#Differences between-subject (vote) across time and for t1 & t2
+wilcox_test(proportions_both_vote_wave, econ~intendedVote)
+wilcox_test(proportions_both_vote_wave, env~intendedVote) #significant
+
+#Filter waves
+data_t1_all <- filter(proportions_both_vote_wave, wave == "t1")
+data_t2_all <- filter(proportions_both_vote_wave, wave == "t2")
+
+# Wilcoxon Rank Sum Test for t1
+wilcox_test(data_t1_all, econ~intendedVote)
+wilcox_test(data_t1_all, env~intendedVote)
+
+# Wilcoxon Rank Sum Test for t2
+wilcox_test(data_t2_all, econ~intendedVote)
+wilcox_test(data_t2_all, env~intendedVote) #significant
+
+#No significant differences between voters in t1
+#significant differences in env between voters in t2
+
+#Effect sizes
+wilcox_effsize(proportions_both_vote_wave, env~intendedVote) #r=0.15
+wilcox_effsize(data_t2_all, env~intendedVote) #r=0.2
+```
+
+```{r}
+#logistic regression with mean across waves with participants that are present in both waves
+# Assuming energyact_fin_summary contains the mean proportions and intendedVote
+#Including participants that changed vote
+model_all <- glmer(intendedVote ~ econ + env + (1 | participantID),
+               family = binomial, data = energyact_fin_summary)
+
+summary(model_all)
+#Odds Ratio Env
+# Extract fixed effects coefficients directly from the model object
+fixed_effects <- coef(model_all)$participantID[["(Intercept)"]]
+
+# Extract the coefficient for env_mean
+env_coef <- fixef(model_all)["env"]
+
+# Calculate the odds ratio for env_mean
+env_or <- exp(env_coef)
+
+# Print the odds ratio
+print(paste("Odds ratio of Env =", env_or))
+per_word_or <- env_or^0.125
+print(paste("Odds ratio of Env per word change (1/8) =", per_word_or))
+
+#Env significantly predicts intendedVote
+#Odds ratio of Env = 7.59
+#Odds ratio per word change (assuming average of 8 words) = 1.29 = 29% increase in likelihood to vote yes per env word
+```
+```{r}
+#logistic regression with mean across waves with participants that are present in both waves
+# Assuming energyact_fin_summary contains the mean proportions and intendedVote
+#Excluding participants that changed vote
+model_cons <- glmer(intendedVote ~ econ + env + (1 | participantID),
+               family = binomial, data = energyact_fin_summary_cons)
+
+summary(model_cons)
+#Odds Ratio Env
+# Extract fixed effects coefficients directly from the model object
+fixed_effects_cons <- coef(model_cons)$participantID[["(Intercept)"]]
+
+# Extract the coefficient for env_mean
+env_coef_cons <- fixef(model_cons)["env"]
+
+# Calculate the odds ratio for env_mean
+env_or_cons <- exp(env_coef_cons)
+
+# Print the odds ratio
+print(paste("Odds ratio of Env =", env_or_cons))
+per_word_or_cons <- env_or_cons^0.125
+print(paste("Odds ratio of Env per word change (1/8) =", per_word_or_cons))
+
+#Env significantly predicts intendedVote
+#Odds ratio of Env = 22.56
+#Odds ratio per word change (assuming average of 8 words) = 1.48 = 48 increase in likelihood to vote yes per env word
+```
+```{r}
+# Assuming proportions_both_vote_wave is your dataframe
+data <- proportions_both_vote_wave
+
+# Convert wave to a factor
+data$wave <- as.factor(data$wave)
+
+# Mixed-effects logistic regression
+mixed_model <- glmer(intendedVote ~ econ + env + wave + (1 | participantID), 
+                     family = binomial(link = "logit"), 
+                     data = data)
+
+# Summary of the model
+summary(mixed_model)
+
+#No significant results
+```
+
+
+
+
+```{r}
+#Plot differences
+```
+
+
+
+
+
+
+
+
