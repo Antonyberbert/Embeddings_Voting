@@ -4,11 +4,7 @@ output: html_document
 date: "2023-11-26"
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
-
-```{r}
+```{r,eval=F,echo=F}
 #Install and load necessary packages
 packages <- c("devtools","here","dplyr","tidyverse","readxl","writexl","hunspell")
 for (package in packages) {
@@ -19,7 +15,7 @@ for (package in packages) {
 lapply(packages,library, character.only=T)
 ```
 
-```{r}
+```{r,eval=F,echo=F}
 structure <- read.csv(here::here("data","energyact_1.csv"))
 additional_data <- read.csv(here::here("data","all_surveys.csv"))
 structure <- rename(structure, participantID = personID)
@@ -29,7 +25,7 @@ energyact <- left_join(structure,
                         by = c("participantID"))
 ```
 
-```{r}
+```{r,eval=F,echo=F}
 check_spelling <- function(word, dict) {
     # Check the word in its original form and in lowercase
     original_check <- hunspell::hunspell_check(word, dict = dict)
@@ -57,7 +53,7 @@ misspelled_df <- data.frame(misspelled_words = misspelled_words, correction = NA
 write_xlsx(misspelled_df, here::here("data","correction_word.xlsx"))
 ```
 
-```{r}
+```{r,eval=F,echo=F}
 #Import corrected file
 correction_word <- read_xlsx(here::here("data","correction_word.xlsx"))
 
@@ -73,7 +69,7 @@ for (i in 1:nrow(correction_word)) {
 }
 ```
 
-```{r}
+```{r,eval=F,echo=F}
 #Lowercase everything
 energyact$word <- tolower(energyact$word)
 
@@ -90,7 +86,7 @@ write_xlsx(last_check,here::here("data","last_check.xlsx"))
 last_corr <- read_xlsx(here::here("data","last_check.xlsx"))
 ```
 
-```{r}
+```{r,eval=F,echo=F}
 #replace original columns in energyact by matching wordID
 energyact <- energyact %>%
     left_join(last_corr, by = "wordID", suffix = c("", ".last_corr")) %>%
@@ -101,7 +97,7 @@ energyact <- energyact %>%
 write_xlsx(energyact,here::here("data","energyact_final.xlsx"))
 ```
 
-```{r}
+```{r,eval=F,echo=F}
 #replace e-auto with elektroauto and ẞ with ss 
 #read in final dataset
 energyact_fin <- read_xlsx(here::here("data","energyact_final.xlsx"))

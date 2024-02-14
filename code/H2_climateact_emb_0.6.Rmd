@@ -1,0 +1,725 @@
+---
+title: "H2_climateact_emb_0.6"
+output: html_document
+date: "2024-02-13"
+---
+
+```{r}
+#Install and load necessary packages
+packages <- c("devtools","here","dplyr","tidyverse","readxl","writexl","hunspell","text2vec","car","broom","lme4","RColorBrewer","rstatix")
+for (package in packages) {
+  if (!requireNamespace(package, quietly = TRUE)) {
+    install.packages(package)
+  }
+}
+lapply(packages,library, character.only=T)
+```
+
+```{r}
+#Install and load embedR
+if (!requireNamespace("embedR", quietly = TRUE)) {
+    # If not installed, install it using devtools
+    devtools::install_github("dwulff/embedR")
+}
+
+library("embedR")
+```
+
+```{r}
+#read in final dataset
+energyact_fin <- read_xlsx(here::here("data","energyact_final.xlsx"))
+
+#read in matching dataset
+matchids <- read.csv(here::here("data","Match_participantID.csv"),sep = ";")
+matchids2 <- matchids %>% select(participantID.wave1,participantID.wave2)
+
+# Select unique rows
+matchids2 <- unique(matchids2)
+
+#load embeddings as R object
+embedding <- readRDS(here::here("data","embedding.rds"))
+```
+
+```{r,echo=F, eval=F}
+#embed chatGPT lists yes-voters
+#1 Umwelt- und Klimaschutz
+#embedR::er_set_tokens("cohere" = "x","huggingface"="x","openai" = "x")
+
+#emb_yes_env = er_embed(c("Umwelt","Klimawandel","Nachhaltigkeit","Ökosystem","Biodiversität","Emissionen","Treibhausgase","Erneuerbare Energie","Ressourcenschonung","Klimaneutralität"),api="cohere",model="embed-multilingual-v3.0")
+
+#2 Dringlichkeit und Handlungsaufforderung
+#emb_yes_urg = er_embed(c("Dringlich","Handeln","Sofortmassnahmen","Frist","Notfall","Aktivismus","Mobilisierung","Engagement","Verantwortung","Initiative"),api="cohere",model="embed-multilingual-v3.0")
+
+#3 Wirtschaftliche Beweggründe
+#emb_yes_econ = er_embed(c("Wirtschaftswachstum","Kosten","Investition","Wettbewerbsfähigkeit","Arbeitsplätze","Innovation","Marktchancen","Energiekosten","Subventionen","Finanzierung"),api="cohere",model="embed-multilingual-v3.0")
+
+#4 Konkrete Massnahmen und Technologische Innovationen
+#emb_yes_tec = er_embed(c("Energiewende","Solarenergie","Windkraft","Elektromobilität","CO2-Steuer","Recycling","Wassermanagement","Smart Grids","Nachhaltige Landwirtschaft","Grüne Technologien"),api="cohere",model="embed-multilingual-v3.0")
+
+#5 Politische Beweggründe
+#emb_yes_pol = er_embed(c("Gesetzgebung","Klimaabkommen","Politische Führung","Parteipolitik","Wählerwillen","Regulierung","Internationale Zusammenarbeit","Umweltpolitik","Lobbyismus","Bürgerinitiativen"),api="cohere",model="embed-multilingual-v3.0")
+
+#6 Soziale und persönliche Motivationen
+#emb_yes_soc = er_embed(c("Gemeinwohl","Generationengerechtigkeit","Lebensqualität","Gesundheit","Bildung","Bewusstsein","Persönliche Verantwortung","Soziales Engagement","Kultureller Wandel","Öffentliche Meinung"),api="cohere",model="embed-multilingual-v3.0")
+```
+
+```{r,eval=F, echo=F}
+#embed chatGPT lists no-voters
+
+#1 Wirtschaftliche und finanzielle Bedenken
+#emb_no_econ = er_embed(c("Kosten","Steuern","Wirtschaftsschaden","Finanzierung","Budgetdefizit","Investitionsrisiko","Wettbewerbsnachteil","Arbeitsplatzverlust","Teuerung","Wirtschaftskrise"),api="cohere",model="embed-multilingual-v3.0")
+
+#2 Skepsis gegenüber der Effektivität und Umsetzung
+#emb_no_ske = er_embed(c("Umsetzbarkeit","Effizienz","Technische Machbarkeit","Langzeitwirkung","Nebenwirkungen","Kosten-Nutzen-Verhältnis","Überregulierung","Realisierbarkeit","Wissenschaftliche Unsicherheit","Komplexität"),api="cohere",model="embed-multilingual-v3.0")
+
+#3 Politische und ideologische Gründe
+#emb_no_pol = er_embed(c("Freiheitseinschränkung","Staatseingriff","Parteipolitik","Regierungsversagen","Ideologie","Machtmissbrauch","Politische Agenda","Souveränität","Zentralisierung","Bürgerrechte"),api="cohere",model="embed-multilingual-v3.0")
+
+#4 Gesellschaftliche und soziale Bedenken
+#emb_no_soc = er_embed(c("Soziale Gerechtigkeit","Gemeinschaftsschaden","Tradition","Kulturelle Identität","Sozialer Wandel","Öffentliche Meinung","Demographischer Wandel","Bildungsniveau","Soziale Spaltung","Integration"),api="cohere",model="embed-multilingual-v3.0")
+
+#5 Persönliche Überzeugungen und Einstellungen
+#emb_no_per = er_embed(c("Skeptizismus","Pessimismus","Individualismus","Pragmatismus","Risikoaversion","Verantwortungsablehnung","Autonomie","Lebensstil","Glaube","Persönliche Freiheit"),api="cohere",model="embed-multilingual-v3.0")
+```
+
+```{r,echo=F, eval=F}
+#save embeddings as R object
+#saveRDS(emb_yes_env, here::here("data", "emb_yes_env.rds"))
+#saveRDS(emb_yes_urg, here::here("data", "emb_yes_urg.rds"))
+#saveRDS(emb_yes_econ, here::here("data", "emb_yes_econ.rds"))
+#saveRDS(emb_yes_tec, here::here("data", "emb_yes_tec.rds"))
+#saveRDS(emb_yes_pol, here::here("data", "emb_yes_pol.rds"))
+#saveRDS(emb_yes_soc, here::here("data", "emb_yes_soc.rds"))
+#saveRDS(emb_no_econ, here::here("data", "emb_no_econ.rds"))
+#saveRDS(emb_no_ske, here::here("data", "emb_no_ske.rds"))
+#saveRDS(emb_no_pol, here::here("data", "emb_no_pol.rds"))
+#saveRDS(emb_no_soc, here::here("data", "emb_no_soc.rds"))
+#saveRDS(emb_no_per, here::here("data", "emb_no_per.rds"))
+```
+
+```{r}
+#Load embeddings
+emb_list <- list(
+  emb_yes_env = readRDS(here::here("data", "emb_yes_env.rds")),
+  emb_yes_urg = readRDS(here::here("data", "emb_yes_urg.rds")),
+  emb_yes_econ = readRDS(here::here("data", "emb_yes_econ.rds")),
+  emb_yes_tec = readRDS(here::here("data", "emb_yes_tec.rds")),
+  emb_yes_pol = readRDS(here::here("data", "emb_yes_pol.rds")),
+  emb_yes_soc = readRDS(here::here("data", "emb_yes_soc.rds")),
+  emb_no_econ = readRDS(here::here("data", "emb_no_econ.rds")),
+  emb_no_ske = readRDS(here::here("data", "emb_no_ske.rds")),
+  emb_no_pol = readRDS(here::here("data", "emb_no_pol.rds")),
+  emb_no_soc = readRDS(here::here("data", "emb_no_soc.rds")),
+  emb_no_per = readRDS(here::here("data", "emb_no_per.rds"))
+)
+```
+
+```{r}
+#Remove t1 and t2 from ID
+energyact_fin <- energyact_fin %>%
+  mutate(participantID = gsub("_t[1|2]$", "", participantID))
+```
+
+```{r}
+# 2. Merge energyact_fin with matchids2 based on participantID of wave 1
+# This will add the participantID.wave2 column to your energyact_fin dataframe for matching rows
+energyact_fin <- energyact_fin %>%
+  left_join(matchids2, by = c("participantID" = "participantID.wave1"))
+
+# 3. Update the participantID for wave 1 participants with their corresponding wave 2 IDs
+energyact_fin <- energyact_fin %>%
+  mutate(participantID = if_else(wave == "t1" & !is.na(participantID.wave2), participantID.wave2, participantID))
+
+# 4. Optionally, remove the temporary columns added during the merge
+energyact_fin$participantID.wave1 <- NULL
+energyact_fin$participantID.wave2 <- NULL
+
+# Count the unique participantIDs in the dataframe
+number_of_unique_ids <- energyact_fin %>% 
+  summarise(unique_ids = n_distinct(participantID)) %>%
+  pull(unique_ids)
+
+# Print the number of unique participantIDs
+print(number_of_unique_ids)
+```
+
+```{r}
+calculate_max_similarity <- function(embedding_study, embedding_list) {
+  # Calculate cosine similarity
+  similarity_matrix <- sim2(embedding_study, embedding_list, method = "cosine")
+  # Get the maximum similarity score for each word
+  max_similarity <- apply(similarity_matrix, 1, max)
+  return(max_similarity)
+}
+
+# Calculating max similarity for each embedding
+for (name in names(emb_list)) {
+  energyact_fin[[paste0("max_similarity_", name)]] <- calculate_max_similarity(embedding, emb_list[[name]])
+}
+```
+
+```{r}
+# Assuming your dataframe is named energyact_fin
+# Transform to long format, calculate max similarity, and assign category
+category <- energyact_fin %>%
+  pivot_longer(cols = starts_with("max_similarity_emb_"), names_to = "category", values_to = "similarity") %>%
+  mutate(category = sub("max_similarity_emb_", "", category)) %>%
+  group_by(wordID) %>%
+  # Assuming there are no ties, directly filter for the max similarity per wordID
+  filter(similarity == max(similarity)) %>%
+  ungroup() %>%
+  select(wordID, category = category)
+
+# Join the category assignment back to the original dataframe
+energyact_fin <- energyact_fin %>%
+  left_join(category, by = "wordID")
+```
+
+```{r}
+# Assuming your original dataframe is named energyact_fin
+# First, identify participants present in both waves
+participants_in_both_waves <- energyact_fin %>%
+  group_by(participantID) %>%
+  filter(all(c("t1", "t2") %in% wave)) %>%
+  ungroup() %>%
+  select(participantID) %>%
+  distinct()
+
+# Now, filter the original dataframe to include only those participants
+energyact_fin_both <- energyact_fin %>%
+  semi_join(participants_in_both_waves, by = "participantID")
+
+# Check the structure of the new dataframe
+str(energyact_fin_both)
+```
+```{r}
+# Calculate the count of each category per participant
+category_counts <- energyact_fin_both %>%
+  group_by(participantID, category) %>%
+  summarise(count = n(), .groups = 'drop')
+
+# Calculate the total entries per participant
+total_counts <- energyact_fin_both %>%
+  group_by(participantID) %>%
+  summarise(total = n(), .groups = 'drop')
+
+# Merge and calculate proportions
+proportions_df <- left_join(category_counts, total_counts, by = "participantID") %>%
+  mutate(proportion = count / total) %>%
+  select(participantID, category, proportion)
+
+# Pivot wider to have separate columns for each category
+proportions_across <- proportions_df %>%
+  pivot_wider(names_from = category, values_from = proportion, values_fill = list(proportion = 0))
+```
+
+```{r}
+#!!!!!!!!!!!!!!!!!!!!!!!!!!
+#Some participants changed their vote from t1 to t2. How should we consider this in the analysis?
+#This means, that when analysing changes across both time points, we have more rows than participants (293 instead of 254).
+
+#Here I calculated the analyses with 293 rows.
+
+# Join the proportions with intendedVote
+energyact_fin_summary <- energyact_fin_both %>%
+  select(participantID, intendedVote) %>%
+  distinct() %>%
+  left_join(proportions_across, by = "participantID")
+
+# Calculate mean and SD of proportions by intendedVote
+descriptive_stats <- energyact_fin_summary %>%
+  group_by(intendedVote) %>%
+  summarise(across(c(no_econ, no_soc, yes_econ, yes_env, yes_soc, yes_tec, no_pol, no_ske, yes_pol, yes_urg, no_per), list(mean = ~mean(., na.rm = TRUE), sd = ~sd(., na.rm = TRUE))))
+
+print(descriptive_stats)
+```
+
+```{r}
+#Calculating overall descriptive stats with only participants with consistent votes
+
+# Create a summary of votes by participant and wave
+votes_summary <- energyact_fin_both %>%
+  group_by(participantID, wave) %>%
+  summarise(intendedVote = unique(intendedVote), .groups = 'drop') %>%
+  pivot_wider(names_from = wave, values_from = intendedVote, names_prefix = "vote_")
+
+# Identify participants with the same vote in t1 and t2
+consistent_vote_participants <- votes_summary %>%
+  filter(vote_t1 == vote_t2) %>%
+  select(participantID)
+
+# Filter to keep only participants with consistent votes
+energyact_fin_consistent <- energyact_fin_both %>%
+  semi_join(consistent_vote_participants, by = "participantID")
+
+# Calculate category counts and total counts as before
+category_counts_cons <- energyact_fin_consistent %>%
+  group_by(participantID, category) %>%
+  summarise(count = n(), .groups = 'drop')
+
+total_counts_cons <- energyact_fin_consistent %>%
+  group_by(participantID) %>%
+  summarise(total = n(), .groups = 'drop')
+
+# Merge, calculate proportions, and pivot wider
+proportions_cons <- left_join(category_counts_cons, total_counts_cons, by = "participantID") %>%
+  mutate(proportion = count / total) %>%
+  select(participantID, category, proportion)
+
+proportions_wide_cons <- proportions_cons %>%
+  pivot_wider(names_from = category, values_from = proportion, values_fill = list(proportion = 0))
+
+# Join with intendedVote and calculate descriptive statistics
+energyact_fin_summary_cons <- energyact_fin_consistent %>%
+  select(participantID, intendedVote) %>%
+  distinct() %>%
+  left_join(proportions_wide_cons, by = "participantID")
+
+descriptive_stats_cons <- energyact_fin_summary_cons %>%
+  group_by(intendedVote) %>%
+  summarise(across(c(no_econ, no_soc, yes_econ, yes_env, yes_soc, yes_tec, no_pol, no_ske, yes_pol, yes_urg, no_per), list(mean = ~mean(., na.rm = TRUE), sd = ~sd(., na.rm = TRUE))))
+
+print(descriptive_stats_cons)
+```
+```{r}
+# Creating df with consistent participants that were present in both waves with proportions per category, wave, and vote
+proportions_wave_cons <- energyact_fin_consistent %>%
+  group_by(participantID, wave) %>%
+  count(category) %>%
+  ungroup() %>%
+  group_by(participantID, wave) %>%
+  mutate(total = sum(n)) %>%
+  ungroup() %>%
+  mutate(proportion = n / total) %>%
+  select(participantID, wave, category, proportion)
+
+# Pivot wider to have separate columns for each category, filling missing categories with zeros
+proportions_category_separate_cons <- proportions_wave_cons %>%
+  pivot_wider(names_from = category, values_from = proportion, values_fill = list(proportion = 0))
+
+# Ensure joining with intendedVote to include it in the dataset
+proportions_both_vote_wave_cons <- energyact_fin_consistent %>%
+  select(participantID, wave, intendedVote) %>%
+  distinct() %>%
+  left_join(proportions_category_separate_cons, by = c("participantID", "wave"))
+```
+
+```{r}
+#Wilcoxon sum rank test to check if econ and env are significantly different between including all participants or only those with consistent votes
+# For the 'econ' category
+variables <- c("no_econ", "no_soc", "yes_econ", "yes_env", "yes_soc", "yes_tec", "no_pol", "no_ske", "yes_pol", "yes_urg", "no_per")
+
+# Initialize an empty list to store results
+results <- list()
+
+# Loop through each variable to perform Wilcoxon test
+for (var in variables) {
+  test_result <- wilcox.test(
+    x = energyact_fin_summary[[var]],
+    y = energyact_fin_summary_cons[[var]],
+    alternative = "two.sided"
+  )
+  
+  # Store the result with a dynamic name in the results list
+  results[[paste(var, "diff", sep = "_")]] <- test_result
+}
+
+# Print the results
+print(results)
+
+
+#Not significantly different
+```
+
+```{r}
+# Creating df with participants that were present in both waves with proportions per category, wave, and vote
+proportions_wave <- energyact_fin_both %>%
+  group_by(participantID, wave) %>%
+  count(category) %>%
+  ungroup() %>%
+  group_by(participantID, wave) %>%
+  mutate(total = sum(n)) %>%
+  ungroup() %>%
+  mutate(proportion = n / total) %>%
+  select(participantID, wave, category, proportion)
+
+# Pivot wider to have separate columns for each category, filling missing categories with zeros
+proportions_category_separate <- proportions_wave %>%
+  pivot_wider(names_from = category, values_from = proportion, values_fill = list(proportion = 0))
+
+# Ensure joining with intendedVote to include it in the dataset
+proportions_both_vote_wave <- energyact_fin_both %>%
+  select(participantID, wave, intendedVote) %>%
+  distinct() %>%
+  left_join(proportions_category_separate, by = c("participantID", "wave"))
+```
+
+```{r}
+# Calculate mean and SD by wave
+summary_by_wave <- proportions_both_vote_wave %>%
+  group_by(wave) %>%
+  summarise(across(variables, list(mean = ~mean(., na.rm = TRUE), 
+                                            sd = ~sd(., na.rm = TRUE))))
+
+print(summary_by_wave)
+```
+
+```{r}
+# Calculate mean and SD by wave and intendedVote
+summary_by_wave_vote <- proportions_both_vote_wave %>%
+  group_by(wave, intendedVote) %>%
+  summarise(across(variables, list(mean = ~mean(., na.rm = TRUE), 
+                                            sd = ~sd(., na.rm = TRUE))))
+
+print(summary_by_wave_vote)
+```
+```{r}
+# List of variables to plot
+variables <- c("no_econ", "no_soc", "yes_econ", "yes_env", "yes_soc", "yes_tec", "no_pol", "no_ske", "yes_pol", "yes_urg", "no_per")
+
+# Function to calculate mean, SE, and plot for each variable
+plot_mean_se_for_variable <- function(var_name) {
+  agg_data <- proportions_both_vote_wave %>%
+    group_by(wave, intendedVote) %>%
+    summarise(!!sym(paste("mean", var_name, sep = "_")) := mean(!!sym(var_name)),
+              !!sym(paste("se", var_name, sep = "_")) := sd(!!sym(var_name)) / sqrt(n()), .groups = 'drop')
+  
+  plot <- ggplot(proportions_both_vote_wave, aes(x = factor(intendedVote), y = !!sym(var_name), fill = factor(intendedVote))) +
+    stat_summary(fun = mean, geom = "bar", position = position_dodge(width = 0.8), width = 0.7) +
+    stat_summary(fun.data = mean_se, geom = "errorbar", position = position_dodge(width = 0.8), width = 0.25) +
+    geom_text(data = agg_data, aes(x = factor(intendedVote), y = !!sym(paste("mean", var_name, sep = "_")) + !!sym(paste("se", var_name, sep = "_")), label = sprintf("%.3f (%.3f)", !!sym(paste("mean", var_name, sep = "_")), !!sym(paste("se", var_name, sep = "_")))),
+              position = position_dodge(width = 0.8), vjust = -0.5, check_overlap = TRUE) +
+    facet_wrap(~wave) +
+    scale_fill_brewer(palette = "Set2", name = "Intended Vote") +
+    labs(x = "Intended Vote", y = paste("Mean", var_name), title = paste("Mean and SE of", var_name, "by Intended Vote, Faceted by Wave")) +
+    theme_minimal() +
+    theme(legend.position = "bottom",
+          axis.title.x = element_text(size = 12, face = "bold"),
+          axis.title.y = element_text(size = 12, face = "bold"),
+          plot.title = element_text(size = 14, face = "bold", hjust = 0.5))
+  
+  # Adjusted save path to save all plots in the "H2" folder within "plot"
+  ggsave(here("plot", "H2", paste(var_name, "_wave_vote_all.png", sep = "")), plot, width = 10, height = 8, dpi = 300)
+}
+
+# Apply the function to each variable
+for (var in variables) {
+  plot_mean_se_for_variable(var)
+}
+```
+
+```{r}
+# Define your variables list
+variables <- c("no_econ", "no_soc", "yes_econ", "yes_env", "yes_soc", "yes_tec", "no_pol", "no_ske", "yes_pol", "yes_urg", "no_per")
+
+# Function to perform Shapiro-Wilk test on the list of variables
+perform_shapiro_tests <- function(data, variables) {
+  results <- list()  # Initialize an empty list to store test results
+  
+  for (var in variables) {
+    # Shapiro-Wilk test for intendedVote == 0
+    test_no <- shapiro.test(data %>% filter(intendedVote == 0) %>% pull(!!sym(var)))
+    
+    # Shapiro-Wilk test for intendedVote == 1
+    test_yes <- shapiro.test(data %>% filter(intendedVote == 1) %>% pull(!!sym(var)))
+    
+    # Store the results
+    results[[paste(var, "no", sep = "_")]] <- test_no
+    results[[paste(var, "yes", sep = "_")]] <- test_yes
+  }
+  
+  return(results)
+}
+
+# Apply the function to your dataframe and variables
+shapiro_results <- perform_shapiro_tests(proportions_both_vote_wave, variables)
+
+# Example of how to print the results
+print(shapiro_results)
+```
+
+```{r}
+perform_wilcoxon_tests <- function(data, variables) {
+  results <- list()  # Initialize an empty list to store test results
+  
+  for (var in variables) {
+    # Wilcoxon signed-rank test for T1 vs T2
+    test_overall <- wilcox.test(
+      x = data %>% filter(wave == "t1") %>% pull(!!sym(var)),
+      y = data %>% filter(wave == "t2") %>% pull(!!sym(var)),
+      paired = TRUE
+    )
+    
+    # Store the result with a dynamically named key
+    results[[paste(var, "test_overall", sep = "_")]] <- test_overall
+  }
+  
+  return(results)
+}
+
+# List of variables to test
+variables <- c("no_econ", "no_soc", "yes_econ", "yes_env", "yes_soc", "yes_tec", "no_pol", "no_ske", "yes_pol", "yes_urg", "no_per")
+
+# Apply the function to your dataframe and variables
+wilcoxon_results <- perform_wilcoxon_tests(proportions_both_vote_wave, variables)
+
+# Print the results
+print(wilcoxon_results)
+
+#yes pol significant
+wilcox_effsize(proportions_both_vote_wave, yes_pol~wave,paired=T) #r = 0.16
+```
+```{r}
+create_and_save_boxplots <- function(data, variables, save_dir = "H2") {
+  data_long <- data %>%
+    pivot_longer(cols = variables, names_to = "variable", values_to = "value") %>%
+    filter(wave %in% c("t1", "t2"))
+
+  # Calculate medians, ensuring NA values are ignored
+  medians <- data_long %>%
+    group_by(wave, variable) %>%
+    summarise(median_value = median(value, na.rm = TRUE), .groups = 'drop')
+
+  for (var in variables) {
+    data_filtered <- filter(data_long, variable == var)
+
+    # Skip plotting if the dataset is empty after filtering
+    if (nrow(data_filtered) == 0) {
+      next
+    }
+
+    # Prepare the plot
+    plot <- ggplot(data_filtered, aes(x = wave, y = value, fill = wave)) +
+      geom_boxplot(alpha = 0.5, outlier.shape = NA) +
+      geom_text(data = filter(medians, variable == var),
+                aes(x = wave, y = median_value, label = sprintf("%.3f", median_value)),
+                vjust = -0.5) +
+      scale_fill_manual(values = c("#56B4E9", "#E69F00")) +
+      labs(title = paste("Variable:", var, "- T1 vs. T2"), x = "Time Point", y = "Value") +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 45, vjust = 0.5),
+            plot.title = element_text(size = 14, face = "bold"),
+            axis.title = element_text(size = 12, face = "bold"))
+
+    # Save the plot using the here package
+    ggsave(here("plot", save_dir, paste("paired_wilcox_across", var, ".png", sep = "")), plot, width = 10, height = 8, dpi = 300)
+  }
+}
+
+# List of variables to plot
+variables <- c("no_econ", "no_soc", "yes_econ", "yes_env", "yes_soc", "yes_tec", "no_pol", "no_ske", "yes_pol", "yes_urg", "no_per")
+
+# Call the function with your dataframe and variables
+create_and_save_boxplots(proportions_both_vote_wave, variables)
+```
+
+```{r}
+# List of variables to test
+variables <- c("no_econ", "no_soc", "yes_econ", "yes_env", "yes_soc", "yes_tec", "no_pol", "no_ske", "yes_pol", "yes_urg", "no_per")
+
+# First, filter 2 data frames for no and yes voters
+data_vote_0 <- filter(proportions_both_vote_wave_cons, intendedVote == 0)
+data_vote_1 <- filter(proportions_both_vote_wave_cons, intendedVote == 1)
+
+# Function to perform Wilcoxon signed rank tests for a list of variables
+perform_wilcoxon_tests_vote <- function(data_0, data_1, variables) {
+  results <- list() # Initialize an empty list to store results
+  
+  for (var in variables) {
+    # Perform Wilcoxon test for intendedVote = 0
+    test_0 <- wilcox.test(data_0[[var]][data_0$wave == "t1"], data_0[[var]][data_0$wave == "t2"], paired = TRUE)
+    
+    # Perform Wilcoxon test for intendedVote = 1
+    test_1 <- wilcox.test(data_1[[var]][data_1$wave == "t1"], data_1[[var]][data_1$wave == "t2"], paired = TRUE)
+    
+    # Store the results
+    results[[paste(var, "test_0", sep = "_")]] <- test_0
+    results[[paste(var, "test_1", sep = "_")]] <- test_1
+  }
+  
+  return(results)
+}
+
+# Apply the function and print the results
+wilcoxon_results_vote <- perform_wilcoxon_tests_vote(data_vote_0, data_vote_1, variables)
+print(wilcoxon_results_vote)
+```
+```{r}
+create_and_save_barplots_voters <- function(data, variables, save_dir = "H2") {
+  # Iterate over variables to create plots
+  for (var in variables) {
+    data_filtered <- data %>%
+      filter(wave %in% c("t1", "t2")) %>%
+      select(intendedVote, wave, !!sym(var)) %>%
+      rename(value = !!sym(var)) %>%
+      mutate(variable = var) # Add variable name to differentiate in the plot
+
+    # Define mean and SE calculations within the plotting function
+    mean_se <- function(x) {
+      n <- sum(!is.na(x))
+      if (n > 0) {
+        se <- sd(x, na.rm = TRUE) / sqrt(n)
+        mean_x <- mean(x, na.rm = TRUE)
+        return(c(y = mean_x, ymin = mean_x - se, ymax = mean_x + se))
+      } else {
+        return(c(y = NA, ymin = NA, ymax = NA))
+      }
+    }
+
+    # Generate plot
+    plot <- ggplot(data_filtered, aes(x = wave, y = value, fill = wave)) +
+      stat_summary(fun.data = mean_se, geom = "bar", position = position_dodge(width = 0.8), aes(group = wave)) +
+      stat_summary(fun.data = mean_se, geom = "errorbar", position = position_dodge(width = 0.8), width = 0.25) +
+      facet_wrap(~intendedVote, scales = "free_y") +
+      scale_fill_manual(values = c("#56B4E9", "#E69F00")) +
+      labs(title = paste("Mean and SE of", var, "by Voter Intention"), x = "Time Point", y = "Value") +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 45, vjust = 0.5),
+            plot.title = element_text(size = 14, face = "bold"),
+            axis.title = element_text(size = 12, face = "bold"),
+            strip.background = element_rect(fill = "lightblue"),
+            strip.text.x = element_text(size = 12, face = "bold"))
+
+    # Construct file name and save plot
+    file_path <- here("plot", save_dir, paste("barplot_across_voters_", var, ".png", sep = ""))
+    ggsave(file_path, plot, width = 10, height = 8, dpi = 300)
+  }
+}
+
+# Assuming 'proportions_both_vote_wave_cons' and 'variables' are defined as before
+create_and_save_barplots_voters(proportions_both_vote_wave_cons, variables)
+```
+
+```{r}
+# List of variables to test
+variables <- c("no_econ", "no_soc", "yes_econ", "yes_env", "yes_soc", "yes_tec", "no_pol", "no_ske", "yes_pol", "yes_urg", "no_per")
+
+perform_wilcoxon_tests_filter_significant <- function(data, variables) {
+  results <- list() # Initialize an empty list to store all results
+  significant_results <- list() # Initialize an empty list for significant results
+  
+  # Filter data for T1 and T2
+  data_t1_all <- filter(data, wave == "t1")
+  data_t2_all <- filter(data, wave == "t2")
+  
+  for (var in variables) {
+    # Wilcoxon Rank Sum Test across time
+    test_across_time <- wilcox.test(data[[var]] ~ data$intendedVote, data = data)
+    
+    # Wilcoxon Rank Sum Test for T1
+    test_t1 <- wilcox.test(data_t1_all[[var]] ~ data_t1_all$intendedVote, data = data_t1_all)
+    
+    # Wilcoxon Rank Sum Test for T2
+    test_t2 <- wilcox.test(data_t2_all[[var]] ~ data_t2_all$intendedVote, data = data_t2_all)
+    
+    # Store the results
+    results[[paste(var, "across_time", sep = "_")]] <- test_across_time
+    results[[paste(var, "t1", sep = "_")]] <- test_t1
+    results[[paste(var, "t2", sep = "_")]] <- test_t2
+  }
+  
+  # Filter for significant results (p-value < 0.05)
+  for (result_name in names(results)) {
+    if (results[[result_name]]$p.value < 0.05) {
+      significant_results[[result_name]] <- results[[result_name]]
+    }
+  }
+  
+  # Print significant results
+  cat("Significant Results (p-value < 0.05):\n")
+  for (result_name in names(significant_results)) {
+    cat(result_name, ":\n")
+    print(significant_results[[result_name]])
+    cat("\n") # Add an extra newline for readability
+  }
+  
+  return(significant_results)
+}
+
+# Apply the function to your dataframe and variables
+significant_wilcoxon_results <- perform_wilcoxon_tests_filter_significant(proportions_both_vote_wave, variables)
+```
+```{r}
+# Assuming 'proportions_both_vote_wave' is your dataframe
+# Filter the data for 'no_pol' variable at T1
+data_filtered <- proportions_both_vote_wave %>%
+  filter(wave == "t1") %>%
+  select(intendedVote, no_pol) %>%
+  na.omit()  # Remove NA values for a cleaner plot
+
+# Create the CDF plot
+cdf_plot <- ggplot(data_filtered, aes(x = no_pol, color = factor(intendedVote))) +
+  stat_ecdf(geom = "step", size = 1.2) +  # Use 'step' to create the CDF line
+  scale_color_manual(values = c("0" = "#E69F00", "1" = "#56B4E9"), 
+                     name = "Voter Intention", 
+                     labels = c("0" = "No", "1" = "Yes")) +
+  labs(title = "CDF of no_pol at T1 by Voter Intention",
+       x = "no_pol Value",
+       y = "Cumulative Probability") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 14, face = "bold"),
+        axis.title.x = element_text(size = 12, face = "bold"),
+        axis.title.y = element_text(size = 12, face = "bold"),
+        legend.title = element_text(size = 12))
+
+# Display the plot
+print(cdf_plot)
+```
+
+```{r}
+create_save_mean_se_barplot <- function(data, variable, wave_condition, title_suffix) {
+  data_filtered <- if (!is.null(wave_condition) && wave_condition != "across") {
+    filter(data, wave == wave_condition)
+  } else {
+    data
+  }
+  
+  summary_data <- data_filtered %>%
+    filter(!is.na(!!sym(variable))) %>%
+    group_by(intendedVote) %>%
+    summarise(
+      Mean = mean(!!sym(variable), na.rm = TRUE),
+      SE = sd(!!sym(variable), na.rm = TRUE) / sqrt(n()),
+      .groups = 'drop'
+    ) %>%
+    mutate(TextPosition = Mean + SE,  # Calculate position for the text
+           Label = sprintf("%.3f (%.3f)", Mean, SE))  # Updated label format to "Mean (SE)"
+  
+  plot <- ggplot(summary_data, aes(x = factor(intendedVote), y = Mean, fill = factor(intendedVote))) +
+    geom_bar(stat = "identity", position = position_dodge(), width = 0.7) +
+    geom_errorbar(aes(ymin = Mean - SE, ymax = Mean + SE), width = 0.25, position = position_dodge(0.7)) +
+    geom_text(aes(y = TextPosition, label = Label), position = position_dodge(width = 0.7), vjust = -0.5, size = 3.5) +  # Adjusted for text position
+    scale_fill_manual(values = c("0" = "#E69F00", "1" = "#56B4E9")) +
+    labs(title = paste(variable, title_suffix), x = "Voter Intention", y = "Mean Value") +
+    theme_minimal() +
+    theme(legend.title = element_blank(),
+          plot.title = element_text(size = 14, face = "bold"),
+          axis.title = element_text(size = 12, face = "bold"),
+          legend.position = "none")
+  
+  # Define the file name and save the plot
+  file_name_suffix <- ifelse(is.null(wave_condition) || wave_condition == "across", "across", wave_condition)
+  file_name <- paste("barplot_votediff", variable, file_name_suffix, "png", sep = ".")
+  
+  ggsave(filename = here("plot", "H2", file_name), plot = plot, width = 8, height = 6, dpi = 300)
+}
+
+# Applying the function for specified conditions
+conditions <- list(
+  list(variable = "no_pol", wave = "t1", title = "at T1"),
+  list(variable = "no_pol", wave = "across", title = "across time points"),
+  list(variable = "no_ske", wave = "across", title = "across time points"),
+  list(variable = "no_ske", wave = "t1", title = "at T1"),
+  list(variable = "yes_env", wave = "across", title = "across time points"),
+  list(variable = "yes_env", wave = "t2", title = "at T2")
+)
+
+# Iterate over each condition to create and save plots
+for (cond in conditions) {
+  create_save_mean_se_barplot(proportions_both_vote_wave, cond$variable, cond$wave, cond$title)
+}
+```
+
+
+
+

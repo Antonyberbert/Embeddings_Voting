@@ -112,7 +112,7 @@ resultfin%>%
        label_filter = group_size > 20)
 ```
 
-```{r}
+```{r,eval=F,echo=F}
 result_fin$group_texts <- sapply(result_fin$group_texts, toString)
 write_xlsx(result_fin, here::here("data","embedR_resfin.xlsx"))
 #cluster 1 economy

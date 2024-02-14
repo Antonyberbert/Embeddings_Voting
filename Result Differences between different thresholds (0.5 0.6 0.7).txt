@@ -1,0 +1,24 @@
+What changes between 0.6 to 0.7 threshold
+
+0.7
+-proportions env and econ are much smaller
+-signed rank econ across voters between t1 and t2 not significant anymore
+-signed rank env for no voters between t1 and t2 significant (0.045 instead of 0.07)
+-between differences: env across time still significant
+-between differences: env t1 significant
+-between differences: env t2 still significant
+-logistic regression without squared the same, but odds ratio env higher (42% instead of 29%)
+-logistic regression squared not significant anymore
+-logistic regression only consistent part: higher odds ratio for env (86% instead of 48%)
+
+0.5 compared to 0.6
+-proportions env and econ greater
+-normality test p-values much smaller (0.02429 compared to 5.091e-08)
+-signed rank econ across voters between t1 and t2 not significant anymore
+-signed rank t1 to t2 higher p-values
+-between differences: env across time still significant but higher p-value
+-between differences: env t1 significant (0.04)
+-between differences: env t2 not significant anymore
+-logistic regression without squared the same, but odds ratio env higher (57% instead of 29%)
+-logistic regression squared not significant anymore
+-logistic regression only consistent part: higher odds ratio for env (95% instead of 48%), and econ significant (p=0.03)
