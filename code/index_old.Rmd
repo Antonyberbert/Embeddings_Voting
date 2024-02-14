@@ -8,7 +8,7 @@ date: "2023-11-07"
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 #Install and load necessary packages
 packages <- c("here","tidyverse","dplyr","readxl","writexl","umap","dbscan","fpc","Rtsne","glmnet","stats")
 for (package in packages) {
@@ -21,7 +21,7 @@ lapply(packages,library, character.only=T)
 
 Reading in the data
 
-```{r}
+```{r, eval = F, echo=F}
 #Read in the datasets "Embeddings_text", "features", & wordEmbeddings and merge them
 sentences <- read.csv(here("data","Embeddings_text.csv"))
 structure <- read_excel(here("data","wordEmbeddings.xlsx"))
@@ -55,7 +55,7 @@ energyact <- energyact[, cols_new]
 head(energyact)
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 embedding_cols <- paste("X", 0:1023, sep = "")
 
 #Visualize embeddings
@@ -72,7 +72,7 @@ tsne_plot <- ggplot(NULL, aes(x = tsne_energyact$Y[, 1], y = tsne_energyact$Y[, 
 print(tsne_plot)
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 #Principal Component Analysis to reduce to important dimensions for new embeddings
 set.seed(123)
 
@@ -93,13 +93,13 @@ plot(cum_explained_variance, type = "b", main="Cumulative Explained Variance",
 #By inspecting the Cumulative graph, choose what number of components explain 95% of variance
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 # Project the data onto the first 300 principal components
 set.seed(123)
 pca_energyact <- pca_result$x[, 1:300]
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 # Apply DBSCAN on PCA reduced set
 set.seed(123)
 db_result <- dbscan::dbscan(pca_energyact, eps = 15, minPts = 5)
@@ -119,7 +119,7 @@ num_noise <- sum(db_result$cluster == 0)
 cat("Number of noise points:", num_noise, "\n")
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 #Create dataframe to inspect cluster with words
 # Extract columns 2:12 from the climateact_word dataset
 energyact_selected <- energyact[, 2:12]
@@ -134,7 +134,7 @@ write_xlsx(energyact_clustered, "energyact_clustered.xlsx")
 View(energyact_clustered)
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 #Create dataset of noise points to cluster them
 energyact_rest <- cbind(energyact[,2:12],energyact_clustered$cluster,scaled_embeddings)
 energyact_rest <- energyact_rest%>%
@@ -154,7 +154,7 @@ plot_rest <- ggplot(NULL, aes(x = tsne_energyact_rest$Y[, 1], y = tsne_energyact
 print(plot_rest)
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 #Principal Component Analysis to reduce to important dimensions for rest embeddings
 set.seed(123)
 
@@ -174,12 +174,12 @@ plot(cum_explained_variance_rest, type = "b", main="Cumulative Explained Varianc
 #By inspecting the Cumulative graph, choose what number of components explain 95% of variance
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 # Project the data onto the first 300 principal components
 pca_rest <- pca_result_rest$x[, 1:300]
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 # Apply DBSCAN on PCA reduced set
 set.seed(123)
 db_result_rest <- dbscan::dbscan(pca_rest, eps = 20, minPts = 3)
@@ -199,7 +199,7 @@ num_noise_rest <- sum(db_result_rest$cluster == 0)
 cat("Number of noise points:", num_noise_rest, "\n")
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 #Create dataframe to inspect rest cluster with words
 # Extract columns 2:12 from the energyact dataset
 energyact_rest_clustered <- energyact_rest[, 1:11]
@@ -211,7 +211,7 @@ energyact_rest_clustered$rest_cluster <- db_result_rest$cluster
 write_xlsx(energyact_rest_clustered, "energyact_rest.xlsx")
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 #Repeat the procedure again
 #Create dataset of noise points to cluster them
 energyact_rest2 <- cbind(energyact_rest_clustered[,1:12],embeddings_rest)
@@ -232,7 +232,7 @@ plot_rest2 <- ggplot(NULL, aes(x = tsne_energyact_rest2$Y[, 1], y = tsne_energya
 print(plot_rest2)
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 #Principal Component Analysis to reduce to important dimensions for rest embeddings
 set.seed(123)
 
@@ -252,12 +252,12 @@ plot(cum_explained_variance_rest2, type = "b", main="Cumulative Explained Varian
 #By inspecting the Cumulative graph, choose what number of components explain 95% of variance
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 # Project the data onto the first 300 principal components
 pca_rest2 <- pca_result_rest2$x[, 1:300]
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 # Apply DBSCAN on PCA reduced set
 set.seed(123)
 db_result_rest2 <- dbscan::dbscan(pca_rest2, eps = 25, minPts = 3)
@@ -277,7 +277,7 @@ num_noise_rest2 <- sum(db_result_rest2$cluster == 0)
 cat("Number of noise points:", num_noise_rest2, "\n")
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 #Create dataframe to inspect rest cluster with words
 # Extract columns 2:12 from the energyact dataset
 energyact_rest2_clustered <- energyact_rest2[, 1:11]
@@ -289,7 +289,7 @@ energyact_rest2_clustered$rest_cluster <- db_result_rest2$cluster
 write_xlsx(energyact_rest2_clustered, "energyact_rest2.xlsx")
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 #Repeat the procedure again
 #Create dataset of noise points to cluster them
 energyact_rest3 <- cbind(energyact_rest2_clustered[,1:12],embeddings_rest2)
@@ -310,7 +310,7 @@ plot_rest3 <- ggplot(NULL, aes(x = tsne_energyact_rest3$Y[, 1], y = tsne_energya
 print(plot_rest3)
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 #Principal Component Analysis to reduce to important dimensions for rest embeddings
 set.seed(123)
 
@@ -330,12 +330,12 @@ plot(cum_explained_variance_rest3, type = "b", main="Cumulative Explained Varian
 #By inspecting the Cumulative graph, choose what number of components explain 95% of variance
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 # Project the data onto the first 300 principal components
 pca_rest3 <- pca_result_rest3$x[, 1:300]
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 # Apply DBSCAN on PCA reduced set
 set.seed(123)
 db_result_rest3 <- dbscan::dbscan(pca_rest3, eps = 27, minPts = 3)
@@ -355,7 +355,7 @@ num_noise_rest3 <- sum(db_result_rest3$cluster == 0)
 cat("Number of noise points:", num_noise_rest3, "\n")
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 #Create dataframe to inspect rest cluster with words
 # Extract columns 2:12 from the energyact dataset
 energyact_rest3_clustered <- energyact_rest3[, 1:11]
@@ -367,7 +367,7 @@ energyact_rest3_clustered$rest_cluster <- db_result_rest3$cluster
 write_xlsx(energyact_rest3_clustered, "energyact_rest3.xlsx")
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 #Repeat the procedure again
 #Create dataset of noise points to cluster them
 energyact_rest4 <- cbind(energyact_rest3_clustered,embeddings_rest3)
@@ -388,7 +388,7 @@ plot_rest4 <- ggplot(NULL, aes(x = tsne_energyact_rest4$Y[, 1], y = tsne_energya
 print(plot_rest4)
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 #Principal Component Analysis to reduce to important dimensions for rest embeddings
 set.seed(123)
 
@@ -408,12 +408,12 @@ plot(cum_explained_variance_rest4, type = "b", main="Cumulative Explained Varian
 #By inspecting the Cumulative graph, choose what number of components explain 95% of variance
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 # Project the data onto the first 300 principal components
 pca_rest4 <- pca_result_rest4$x[, 1:300]
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 # Apply DBSCAN on PCA reduced set
 set.seed(123)
 db_result_rest4 <- dbscan::dbscan(pca_rest4, eps = 28, minPts = 3)
@@ -433,7 +433,7 @@ num_noise_rest4 <- sum(db_result_rest4$cluster == 0)
 cat("Number of noise points:", num_noise_rest4, "\n")
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 #Create dataframe to inspect rest cluster with words
 # Extract columns 2:12 from the energyact dataset
 energyact_rest4_clustered <- energyact_rest4[, 1:11]
@@ -445,7 +445,7 @@ energyact_rest4_clustered$rest_cluster <- db_result_rest4$cluster
 write_xlsx(energyact_rest4_clustered, "energyact_rest4.xlsx")
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 #Repeat the procedure again
 #Create dataset of noise points to cluster them
 energyact_rest5 <- cbind(energyact_rest4_clustered,embeddings_rest4)
@@ -466,7 +466,7 @@ plot_rest5 <- ggplot(NULL, aes(x = tsne_energyact_rest5$Y[, 1], y = tsne_energya
 print(plot_rest5)
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 #Principal Component Analysis to reduce to important dimensions for rest embeddings
 set.seed(123)
 
@@ -486,12 +486,12 @@ plot(cum_explained_variance_rest5, type = "b", main="Cumulative Explained Varian
 #By inspecting the Cumulative graph, choose what number of components explain 95% of variance
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 # Project the data onto the first 300 principal components
 pca_rest5 <- pca_result_rest5$x[, 1:300]
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 # Apply DBSCAN on PCA reduced set
 set.seed(123)
 db_result_rest5 <- dbscan::dbscan(pca_rest5, eps = 29, minPts = 3)
@@ -511,7 +511,7 @@ num_noise_rest5 <- sum(db_result_rest5$cluster == 0)
 cat("Number of noise points:", num_noise_rest5, "\n")
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 #Create dataframe to inspect rest cluster with words
 # Extract columns 2:12 from the energyact dataset
 energyact_rest5_clustered <- energyact_rest5[, 1:11]
@@ -523,7 +523,7 @@ energyact_rest5_clustered$rest_cluster <- db_result_rest5$cluster
 write_xlsx(energyact_rest5_clustered, "energyact_rest5.xlsx")
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 #Repeat the procedure again
 #Create dataset of noise points to cluster them
 energyact_rest6 <- cbind(energyact_rest5_clustered,embeddings_rest5)
@@ -544,7 +544,7 @@ plot_rest6 <- ggplot(NULL, aes(x = tsne_energyact_rest6$Y[, 1], y = tsne_energya
 print(plot_rest6)
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 #Principal Component Analysis to reduce to important dimensions for rest embeddings
 set.seed(123)
 
@@ -564,12 +564,12 @@ plot(cum_explained_variance_rest6, type = "b", main="Cumulative Explained Varian
 #By inspecting the Cumulative graph, choose what number of components explain 95% of variance
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 # Project the data onto the first 300 principal components
 pca_rest6 <- pca_result_rest6$x[, 1:300]
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 # Apply DBSCAN on PCA reduced set
 set.seed(123)
 db_result_rest6 <- dbscan::dbscan(pca_rest6, eps = 30, minPts = 3)
@@ -589,7 +589,7 @@ num_noise_rest6 <- sum(db_result_rest6$cluster == 0)
 cat("Number of noise points:", num_noise_rest6, "\n")
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 #Create dataframe to inspect rest cluster with words
 # Extract columns 2:12 from the energyact dataset
 energyact_rest6_clustered <- energyact_rest6[, 1:11]
@@ -601,7 +601,7 @@ energyact_rest6_clustered$rest_cluster <- db_result_rest6$cluster
 write_xlsx(energyact_rest6_clustered, "energyact_rest6.xlsx")
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 #Repeat the procedure again
 #Create dataset of noise points to cluster them
 energyact_rest7 <- cbind(energyact_rest6_clustered,embeddings_rest6)
@@ -622,7 +622,7 @@ plot_rest7 <- ggplot(NULL, aes(x = tsne_energyact_rest7$Y[, 1], y = tsne_energya
 print(plot_rest7)
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 #Principal Component Analysis to reduce to important dimensions for rest embeddings
 set.seed(123)
 
@@ -642,12 +642,12 @@ plot(cum_explained_variance_rest7, type = "b", main="Cumulative Explained Varian
 #By inspecting the Cumulative graph, choose what number of components explain 95% of variance
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 # Project the data onto the first 300 principal components
 pca_rest7 <- pca_result_rest7$x[, 1:300]
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 # Apply DBSCAN on PCA reduced set
 set.seed(123)
 db_result_rest7 <- dbscan::dbscan(pca_rest7, eps = 31, minPts = 3)
@@ -667,7 +667,7 @@ num_noise_rest7 <- sum(db_result_rest7$cluster == 0)
 cat("Number of noise points:", num_noise_rest7, "\n")
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 #Create dataframe to inspect rest cluster with words
 # Extract columns 2:12 from the energyact dataset
 energyact_rest7_clustered <- energyact_rest7[, 1:11]
@@ -679,7 +679,7 @@ energyact_rest7_clustered$rest_cluster <- db_result_rest7$cluster
 write_xlsx(energyact_rest7_clustered, "energyact_rest7.xlsx")
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 #Repeat the procedure again
 #Create dataset of noise points to cluster them
 energyact_rest8 <- cbind(energyact_rest7_clustered,embeddings_rest7)
@@ -700,7 +700,7 @@ plot_rest8 <- ggplot(NULL, aes(x = tsne_energyact_rest8$Y[, 1], y = tsne_energya
 print(plot_rest8)
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 #Principal Component Analysis to reduce to important dimensions for rest embeddings
 set.seed(123)
 
@@ -720,12 +720,12 @@ plot(cum_explained_variance_rest8, type = "b", main="Cumulative Explained Varian
 #By inspecting the Cumulative graph, choose what number of components explain 95% of variance
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 # Project the data onto the first 300 principal components
 pca_rest8 <- pca_result_rest8$x[, 1:300]
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 # Apply DBSCAN on PCA reduced set
 set.seed(123)
 db_result_rest8 <- dbscan::dbscan(pca_rest8, eps = 32, minPts = 3)
@@ -745,7 +745,7 @@ num_noise_rest8 <- sum(db_result_rest8$cluster == 0)
 cat("Number of noise points:", num_noise_rest8, "\n")
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 #Create dataframe to inspect rest cluster with words
 # Extract columns 2:12 from the energyact dataset
 energyact_rest8_clustered <- energyact_rest8[, 1:11]
@@ -757,7 +757,7 @@ energyact_rest8_clustered$rest_cluster <- db_result_rest8$cluster
 write_xlsx(energyact_rest8_clustered, "energyact_rest8.xlsx")
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 #Repeat the procedure again
 #Create dataset of noise points to cluster them
 energyact_rest9 <- cbind(energyact_rest8_clustered,embeddings_rest8)
@@ -778,7 +778,7 @@ plot_rest9 <- ggplot(NULL, aes(x = tsne_energyact_rest9$Y[, 1], y = tsne_energya
 print(plot_rest9)
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 #Principal Component Analysis to reduce to important dimensions for rest embeddings
 set.seed(123)
 
@@ -798,7 +798,7 @@ plot(cum_explained_variance_rest9, type = "b", main="Cumulative Explained Varian
 #By inspecting the Cumulative graph, choose what number of components explain 95% of variance
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 # Project the data onto the first 300 principal components
 pca_rest9 <- pca_result_rest9$x[, 1:300]
 ```
@@ -823,7 +823,7 @@ num_noise_rest9 <- sum(db_result_rest9$cluster == 0)
 cat("Number of noise points:", num_noise_rest9, "\n")
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 #Create dataframe to inspect rest cluster with words
 # Extract columns 2:12 from the energyact dataset
 energyact_rest9_clustered <- energyact_rest9[, 1:11]
@@ -835,7 +835,7 @@ energyact_rest9_clustered$rest_cluster <- db_result_rest9$cluster
 write_xlsx(energyact_rest9_clustered, "energyact_rest9.xlsx")
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 #Repeat the procedure again
 #Create dataset of noise points to cluster them
 energyact_rest10 <- cbind(energyact_rest9_clustered,embeddings_rest9)
@@ -856,7 +856,7 @@ plot_rest10 <- ggplot(NULL, aes(x = tsne_energyact_rest10$Y[, 1], y = tsne_energ
 print(plot_rest10)
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 #Principal Component Analysis to reduce to important dimensions for rest embeddings
 set.seed(123)
 
@@ -876,12 +876,12 @@ plot(cum_explained_variance_rest10, type = "b", main="Cumulative Explained Varia
 #By inspecting the Cumulative graph, choose what number of components explain 95% of variance
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 # Project the data onto the first 300 principal components
 pca_rest10 <- pca_result_rest10$x[, 1:250]
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 # Apply DBSCAN on PCA reduced set
 set.seed(123)
 db_result_rest10 <- dbscan::dbscan(pca_rest10, eps = 33, minPts = 3)
@@ -901,7 +901,7 @@ num_noise_rest10 <- sum(db_result_rest10$cluster == 0)
 cat("Number of noise points:", num_noise_rest10, "\n")
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 #Create dataframe to inspect rest cluster with words
 # Extract columns 2:12 from the energyact dataset
 energyact_rest10_clustered <- energyact_rest10[, 1:11]
@@ -913,7 +913,7 @@ energyact_rest10_clustered$rest_cluster <- db_result_rest10$cluster
 write_xlsx(energyact_rest10_clustered, "energyact_rest10.xlsx")
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 #Repeat the procedure again
 #Create dataset of noise points to cluster them
 energyact_rest11 <- cbind(energyact_rest10_clustered,embeddings_rest10)
@@ -934,7 +934,7 @@ plot_rest11 <- ggplot(NULL, aes(x = tsne_energyact_rest11$Y[, 1], y = tsne_energ
 print(plot_rest11)
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 #Principal Component Analysis to reduce to important dimensions for rest embeddings
 set.seed(123)
 
@@ -954,12 +954,12 @@ plot(cum_explained_variance_rest11, type = "b", main="Cumulative Explained Varia
 #By inspecting the Cumulative graph, choose what number of components explain 95% of variance
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 # Project the data onto the first 300 principal components
 pca_rest11 <- pca_result_rest11$x[, 1:250]
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 # Apply DBSCAN on PCA reduced set
 set.seed(123)
 db_result_rest11 <- dbscan::dbscan(pca_rest11, eps = 34, minPts = 3)
@@ -979,7 +979,7 @@ num_noise_rest11 <- sum(db_result_rest11$cluster == 0)
 cat("Number of noise points:", num_noise_rest11, "\n")
 ```
 
-```{r}
+```{r, eval = F, echo=F}
 #Create dataframe to inspect rest cluster with words
 # Extract columns 2:12 from the energyact dataset
 energyact_rest11_clustered <- energyact_rest11[, 1:11]
