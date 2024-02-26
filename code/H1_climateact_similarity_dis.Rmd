@@ -12,7 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 #Install and load necessary packages
-packages <- c("devtools","here","dplyr","tidyverse","readxl","writexl","hunspell","text2vec","car","broom","lme4")
+packages <- c("devtools","here","dplyr","tidyverse","readxl","writexl","hunspell","text2vec","car","broom","lme4","Matrix")
 for (package in packages) {
   if (!requireNamespace(package, quietly = TRUE)) {
     install.packages(package)
@@ -34,6 +34,13 @@ library("embedR")
 ```{r}
 #read in final dataset
 energyact_fin <- read_xlsx(here::here("data","energyact_final.xlsx"))
+
+#read in matching dataset
+matchids <- read.csv(here::here("data","Match_participantID.csv"),sep = ";")
+matchids2 <- matchids %>% select(participantID.wave1,participantID.wave2)
+
+# Select unique rows
+matchids2 <- unique(matchids2)
 
 #load embeddings as R object
 embedding <- readRDS(here::here("data","embedding.rds"))
@@ -59,6 +66,37 @@ embedding <- readRDS(here::here("data","embedding.rds"))
 ```
 
 ```{r}
+#Remove t1 and t2 from ID
+energyact_fin <- energyact_fin %>%
+  mutate(participantID = gsub("_t[1|2]$", "", participantID))
+```
+
+```{r}
+# 2. Merge energyact_fin with matchids2 based on participantID of wave 1
+# This will add the participantID.wave2 column to your energyact_fin dataframe for matching rows
+energyact_fin <- energyact_fin %>%
+  left_join(matchids2, by = c("participantID" = "participantID.wave1"))
+
+# 3. Update the participantID for wave 1 participants with their corresponding wave 2 IDs
+energyact_fin <- energyact_fin %>%
+  mutate(participantID = if_else(wave == "t1" & !is.na(participantID.wave2), participantID.wave2, participantID))
+
+# 4. Optionally, remove the temporary columns added during the merge
+energyact_fin$participantID.wave1 <- NULL
+energyact_fin$participantID.wave2 <- NULL
+
+# Count the unique participantIDs in the dataframe
+number_of_unique_ids <- energyact_fin %>% 
+  summarise(unique_ids = n_distinct(participantID)) %>%
+  pull(unique_ids)
+
+# Print the number of unique participantIDs
+print(number_of_unique_ids)
+```
+
+```{r}
+set.seed(26)
+
 calculate_max_similarity <- function(embedding_study, embedding_list) {
   # Calculate cosine similarity
   similarity_matrix <- sim2(embedding_study, embedding_list, method = "cosine")
@@ -96,6 +134,24 @@ last_two_columns <- names(H1_df)[(ncol(H1_df)-1):ncol(H1_df)]
 
 # Add the last two columns from H1_df to energyact_fin
 energyact_fin[last_two_columns] <- H1_df[last_two_columns]
+```
+
+```{r}
+# Assuming your original dataframe is named energyact_fin
+# First, identify participants present in both waves
+participants_in_both_waves <- energyact_fin %>%
+  group_by(participantID) %>%
+  filter(all(c("t1", "t2") %in% wave)) %>%
+  ungroup() %>%
+  select(participantID) %>%
+  distinct()
+
+# Now, filter the original dataframe to include only those participants
+energyact_fin_both <- energyact_fin %>%
+  semi_join(participants_in_both_waves, by = "participantID")
+
+# Check the structure of the new dataframe
+str(energyact_fin_both)
 ```
 
 ```{r}
@@ -164,6 +220,7 @@ similarity_H1_vote <- ggplot(energyact_fin_long, aes(x = reorder(word, -similari
 
 ggsave(here::here("plot","similarity_dis","similarity_H1_vote.png"), similarity_H1_vote, width = 10, height = 8, dpi = 300,bg="transparent")
 ```
+
 ```{r}
 # Median for each wave
 medians_by_wave <- energyact_fin_long %>%
@@ -184,6 +241,7 @@ similarity_H1_vote_wave <- ggplot(energyact_fin_long, aes(x = reorder(word, -sim
 
 ggsave(here::here("plot","similarity_dis","similarity_H1_vote_wave.png"), similarity_H1_vote_wave, width = 10, height = 8, dpi = 300,bg="transparent")
 ```
+
 ```{r}
 # Separate plots for each category
 similarity_econ_vote <- ggplot(subset(energyact_fin_long, category == "max_similarity_econ"), aes(x = reorder(word, -similarity), y = similarity)) +
@@ -213,48 +271,79 @@ ggsave(here::here("plot","similarity_dis","similarity_env_vote.png"), similarity
 
 ```{r}
 #Factorize intended Vote
-energyact_fin$fintendedVote <- factor(energyact_fin$intendedVote, levels = c(0, 1))
+energyact_fin_both$fintendedVote <- factor(energyact_fin_both$intendedVote, levels = c(0, 1))
 
-# Logistic regression model with random intercepts for participantID
+# Ensure 'wave' is treated as a factor if you plan to use it directly or interact it with other predictors
+energyact_fin_both$fwave <- factor(energyact_fin_both$wave, levels = c("t1", "t2"))
+
+# Model with random intercepts for participantID to account for between-participant variability
+# This model does not include 'wave' as a fixed effect since the main predictors are 'max_similarity_econ' and 'max_similarity_env'
+# However, it acknowledges within-participant variability through the random intercepts
 model_H1 <- glmer(fintendedVote ~ max_similarity_econ + max_similarity_env + (1 | participantID), 
-               data = energyact_fin, 
-               family = binomial)
+                  data = energyact_fin_both, 
+                  family = binomial)
 
 summary(model_H1)
-
-# Calculate odds ratios
-odds_ratios_H1 <- exp(coef(summary(model_H1)))
-
-# The exponentiated coefficients are the odds ratios for the fixed effects
-odds_ratios_H1
 ```
 
 ```{r}
-# Subset the data for wave t1 and t2
-data_t1 <- subset(energyact_fin, wave == "t1")
-data_t2 <- subset(energyact_fin, wave == "t2")
+# Model with random intercepts for participantID and by considering wave as a within-subjects factor
+# This model includes wave as a fixed effect to see its overall effect and allows for random intercepts across participants
+model_H1_with_wave <- glmer(fintendedVote ~ max_similarity_econ + max_similarity_env + fwave + (1 | participantID), 
+                            data = energyact_fin_both, 
+                            family = binomial)
 
-# Logistic regression model for wave t1
-model_t1 <- glmer(intendedVote ~ max_similarity_econ + max_similarity_env + (1 | participantID), 
-                  data = data_t1, 
-                  family = binomial)
-
-# Logistic regression model for wave t2
-model_t2 <- glmer(intendedVote ~ max_similarity_econ + max_similarity_env + (1 | participantID), 
-                  data = data_t2, 
-                  family = binomial)
-
-# Summarize the models
-summary(model_t1)
-summary(model_t2)
-
-# Calculate odds ratios for wave t1
-odds_ratios_t1 <- exp(coef(summary(model_t1)))
-
-# Calculate odds ratios for wave t2
-odds_ratios_t2 <- exp(coef(summary(model_t2)))
-
-# Display odds ratios
-odds_ratios_t1
-odds_ratios_t2
+summary(model_H1_with_wave)
 ```
+
+```{r}
+#Check Assumptions
+# Calculate Pearson residuals
+residuals_pearson <- residuals(model_H1_with_wave, type = "pearson")
+
+# Plotting the Pearson residuals against fitted values
+plot(fitted(model_H1_with_wave), residuals_pearson,
+     xlab = "Fitted Values", ylab = "Pearson Residuals",
+     main = "Residuals vs Fitted")
+abline(h = 0, col = "red")
+
+# Extract random effects
+ran_eff <- ranef(model_H1_with_wave)$participantID
+
+# Plotting a histogram of random intercepts
+hist(ran_eff[, "(Intercept)"], breaks = 20, main = "Histogram of Random Intercepts")
+
+# QQ plot of random intercepts
+qqnorm(ran_eff[, "(Intercept)"])
+qqline(ran_eff[, "(Intercept)"], col = "red")
+
+```
+
+
+```{r}
+# Extract random intercepts for participantID
+random_intercepts <- ranef(model_H1_with_wave)$participantID[, "(Intercept)"]
+
+# Plot a histogram of the random intercepts
+hist(random_intercepts, breaks = 30, main = "Histogram of Random Intercepts", xlab = "Random Intercept Values")
+
+# QQ plot for random intercepts
+qqnorm(random_intercepts)
+qqline(random_intercepts, col = "red")
+
+# Shapiro-Wilk test for normality
+shapiro.test(random_intercepts)
+```
+
+```{r}
+# Fit a simplified glm model with the same fixed effects for demonstration
+simplified_model <- glm(fintendedVote ~ max_similarity_econ + max_similarity_env + wave,
+                        family = binomial, data = energyact_fin_both)
+
+# Calculate VIF for the fixed effects predictors in the simplified model
+vif_values <- vif(simplified_model)
+
+# Print the VIF values
+print(vif_values)
+```
+

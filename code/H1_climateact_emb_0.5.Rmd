@@ -740,7 +740,7 @@ shapiro.test(proportions_both_vote_wave$env[proportions_both_vote_wave$intendedV
 ```
 
 ```{r}
-# Wilcoxon signed-rank test for econ overall
+# Wilcoxon signed-rank test for proportions overall
 econ_test_overall <- wilcox.test(proportions_both_vote_wave$econ[proportions_both_vote_wave$wave=="t1"], proportions_both_vote_wave$econ[proportions_both_vote_wave$wave=="t2"], paired = TRUE)
 
 env_test_overall <- wilcox.test(proportions_both_vote_wave$env[proportions_both_vote_wave$wave=="t1"], proportions_both_vote_wave$env[proportions_both_vote_wave$wave=="t2"], paired = TRUE)
@@ -936,27 +936,39 @@ ggsave(here::here("plot","H1_0.5","paired_wilcox_yes_econ.png"), paired_wilcox_y
 
 ```{r}
 #Differences between-subject (vote) across time and for t1 & t2
-wilcox_test(proportions_both_vote_wave, econ~intendedVote)
-wilcox_test(proportions_both_vote_wave, env~intendedVote) #significant
+#econ
+wilcox.test(proportions_both_vote_wave$econ[proportions_both_vote_wave$intendedVote==0],proportions_both_vote_wave$econ[proportions_both_vote_wave$intendedVote==1],alternative="greater")
+#env
+wilcox.test(proportions_both_vote_wave$env[proportions_both_vote_wave$intendedVote==1],proportions_both_vote_wave$env[proportions_both_vote_wave$intendedVote==0],alternative="greater")
 
 #Filter waves
 data_t1_all <- filter(proportions_both_vote_wave, wave == "t1")
 data_t2_all <- filter(proportions_both_vote_wave, wave == "t2")
 
 # Wilcoxon Rank Sum Test for t1
-wilcox_test(data_t1_all, econ~intendedVote)
-wilcox_test(data_t1_all, env~intendedVote)
+#econ t1
+wilcox.test(data_t1_all$econ[data_t1_all$intendedVote==0],data_t1_all$econ[data_t1_all$intendedVote==1],alternative="greater")
+
+#env t1
+wilcox.test(data_t1_all$env[data_t1_all$intendedVote==1],data_t1_all$env[data_t1_all$intendedVote==0],alternative="greater")
 
 # Wilcoxon Rank Sum Test for t2
-wilcox_test(data_t2_all, econ~intendedVote)
-wilcox_test(data_t2_all, env~intendedVote) #significant
+#econ t2
+wilcox.test(data_t2_all$econ[data_t2_all$intendedVote==0],data_t2_all$econ[data_t2_all$intendedVote==1],alternative="greater")
+
+#env t2
+wilcox.test(data_t2_all$env[data_t2_all$intendedVote==1],data_t2_all$env[data_t2_all$intendedVote==0],alternative="greater")
+
 
 #No significant differences between voters in t1
 #significant differences in env between voters in t2
 
 #Effect sizes
-wilcox_effsize(proportions_both_vote_wave, env~intendedVote) #r=0.15
-wilcox_effsize(data_t2_all, env~intendedVote) #r=0.2
+wilcox_effsize(proportions_both_vote_wave, env~intendedVote, ref.group = "1",detailed=T,alternative="greater")
+
+wilcox_effsize(data_t1_all, env~intendedVote, ref.group = "1",detailed=T,alternative="greater")
+
+wilcox_effsize(data_t2_all, env~intendedVote, ref.group = "1",detailed=T,alternative="greater")
 ```
 
 ```{r}
@@ -1063,14 +1075,17 @@ between_wilcox_econ_t2 <- ggplot(filter(proportions_both_vote_wave, wave == "t2"
   scale_fill_manual(values = custom_colors)
 
 ggsave(here::here("plot","H1_0.5","between_wilcox_econ_t2.png"), between_wilcox_econ_t2, width = 10, height = 8, dpi = 300)
-``` 
+```
+
 ```{r}
 #logistic regression with mean across waves with participants that are present in both waves
 # Assuming energyact_fin_summary contains the mean proportions and intendedVote
 #Including participants that changed vote
 
+energyact_fin_summary$fintendedVote <- factor(energyact_fin_summary$intendedVote)
+
 # Logistic regression
-model_all <- glmer(intendedVote ~ econ + env + (1 | participantID),
+model_all <- glmer(fintendedVote ~ econ + env + (1 | participantID),
                    family = binomial, data = energyact_fin_summary)
 
 # Display the summary of the adjusted model
@@ -1095,60 +1110,76 @@ print(paste("Odds ratio of Env per word change (1/8) =", per_word_or))
 #Odds ratio per word change (assuming average of 8 words) = 1.29 = 29% increase in likelihood to vote yes per env word
 ```
 
-
 ```{r}
-# Generate new data for prediction
-new_data_env <- with(energyact_fin_summary, expand.grid(
-  env = seq(min(env), max(env), length.out = 100),
-  econ = mean(econ), # Hold econ at its mean
-  participantID = unique(participantID)[1] # Assume random effect for a single participant
-))
+# Conducting the regression without random effects
+model_all_glm <- glm(fintendedVote ~ econ + env,
+                     family = binomial, data = energyact_fin_summary)
 
-# Predict probabilities for the new data
-new_data_env$predicted <- predict(model_all, newdata = new_data_env, type = "response")
+# Displaying the summary of the model
+summary(model_all_glm)
 
-# Plotting
-ggplot(new_data_env, aes(x = env, y = predicted)) +
-  geom_line() +
-  labs(x = "Env", y = "Predicted Probability of Intended Vote") +
-  theme_minimal() +
-  ggtitle("Predicted Probability of Intended Vote vs. Env")
-
+odds_ratio_env <- exp(coef(model_all_glm)["env"])
+odds_ratio_env
+print(paste("Odds ratio of Env =", odds_ratio_env))
+per_word_or <- odds_ratio_env^0.125
+print(paste("Odds ratio of Env per word change (1/8) =", per_word_or))
 ```
-
 ```{r}
-#logistic regression with mean across waves with participants that are present in both waves
-# Assuming energyact_fin_summary contains the mean proportions and intendedVote
-#Including participants that changed vote
-#Adding nonlinear relationship (env squared)
-
-# Add a new column for env squared to the dataset
+# Adding squared terms for continuous predictors
+energyact_fin_summary$econ_squared <- energyact_fin_summary$econ^2
 energyact_fin_summary$env_squared <- energyact_fin_summary$env^2
 
-# Adjusted logistic regression model to include env and env squared
-model_all_squared <- glmer(intendedVote ~ econ + env + env_squared + (1 | participantID),
-                   family = binomial, data = energyact_fin_summary)
+# Fit the model including squared terms
+model_with_squared_terms <- glm(fintendedVote ~ econ + env + econ_squared + env_squared,
+                                family = binomial, data = energyact_fin_summary)
 
-# Display the summary of the adjusted model
-summary(model_all_squared)
-#Odds Ratio Env
-# Extract fixed effects coefficients directly from the model object
-fixed_effects_squared <- coef(model_all_squared)$participantID[["(Intercept)"]]
+# Check the summary for significance of squared terms
+summary(model_with_squared_terms)
 
-# Extract the coefficient for env_mean
-env_coef_squared <- fixef(model_all_squared)["env"]
+#Check Multicollinearity; VIF < 5 is ok
+vif(model_all_glm)
 
-# Calculate the odds ratio for env_mean
-env_or_squared <- exp(env_coef_squared)
+# Plot to identify influential cases
+par(mfrow = c(2, 2))
+plot(model_all_glm)
+```
+```{r}
+# Fit the logistic regression model
+model_all_glm <- glm(intendedVote ~ econ + env,
+                     family = binomial, data = energyact_fin_summary)
 
-# Print the odds ratio
-print(paste("Odds ratio of Env =", env_or_squared))
-per_word_or_squared <- env_or_squared^0.125
-print(paste("Odds ratio of Env per word change (1/8) =", per_word_or_squared))
+# Get the fitted probabilities
+energyact_fin_summary$fitted_probs <- predict(model_all_glm, type = "response")
 
-#Env significantly predicts intendedVote
-#Odds ratio of Env = 7.59
-#Odds ratio per word change (assuming average of 8 words) = 1.29 = 29% increase in likelihood to vote yes per env word
+# Convert probabilities to log-odds
+energyact_fin_summary$log_odds <- log(energyact_fin_summary$fitted_probs / (1 - energyact_fin_summary$fitted_probs))
+
+# Create a scatter plot for 'econ' with a smooth line
+ggplot(energyact_fin_summary, aes(x = econ, y = log_odds)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "loess", color = "red") +
+  labs(title = "Log-Odds vs Econ", x = "Economic Predictor", y = "Log-Odds of Intended Vote")
+
+# Create a scatter plot for 'env' with a smooth line
+ggplot(energyact_fin_summary, aes(x = env, y = log_odds)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "loess", color = "red") +
+  labs(title = "Log-Odds vs Env", x = "Environmental Predictor", y = "Log-Odds of Intended Vote")
+```
+```{r}
+#Logistic regression with wave
+proportions_both_vote_wave$fwave <- as.factor(proportions_both_vote_wave$wave)
+
+proportions_both_vote_wave$fintendedVote <- as.factor(proportions_both_vote_wave$intendedVote)
+
+
+# Mixed-effects logistic regression
+mixed_model <- glmer(intendedVote ~ econ + env + fwave + (1 | participantID), 
+                     family = binomial(link = "logit"), 
+                     data = proportions_both_vote_wave)
+
+# Summary of the model
+summary(mixed_model)
 ```
 
 ```{r}
@@ -1187,71 +1218,7 @@ print(paste("Turning point of Env: ", turning_point))
 ```
 
 
-```{r}
-#logistic regression with mean across waves with participants that are present in both waves
-# Assuming energyact_fin_summary contains the mean proportions and intendedVote
-#Excluding participants that changed vote
-model_cons <- glmer(intendedVote ~ econ + env + (1 | participantID),
-               family = binomial, data = energyact_fin_summary_cons)
 
-summary(model_cons)
-#Odds Ratio Env
-# Extract fixed effects coefficients directly from the model object
-fixed_effects_cons <- coef(model_cons)$participantID[["(Intercept)"]]
-
-# Extract the coefficient for env_mean
-env_coef_cons <- fixef(model_cons)["env"]
-
-# Calculate the odds ratio for env_mean
-env_or_cons <- exp(env_coef_cons)
-
-# Print the odds ratio
-print(paste("Odds ratio of Env =", env_or_cons))
-per_word_or_cons <- env_or_cons^0.125
-print(paste("Odds ratio of Env per word change (1/8) =", per_word_or_cons))
-
-#Env significantly predicts intendedVote
-#Odds ratio of Env = 22.56
-#Odds ratio per word change (assuming average of 8 words) = 1.48 = 48 increase in likelihood to vote yes per env word
-```
-
-```{r}
-# Generate new data for prediction focusing on 'env'
-new_data_env_cons <- with(energyact_fin_summary_cons, expand.grid(
-  env = seq(min(env), max(env), length.out = 100),
-  econ = mean(econ, na.rm = TRUE), # Hold econ at its mean, accounting for NA values
-  participantID = unique(participantID)[1] # Assume random effect for a single representative participant
-))
-
-# Predict probabilities for the new data based on the model
-new_data_env_cons$predicted <- predict(model_cons, newdata = new_data_env_cons, type = "response")
-
-# Plotting the predicted probabilities against 'env'
-ggplot(new_data_env_cons, aes(x = env, y = predicted)) +
-  geom_line() +
-  labs(x = "Environmental Concern (Env)", y = "Predicted Probability of Intended Vote") +
-  theme_minimal() +
-  ggtitle("Predicted Probability of Intended Vote vs. Environmental Concern")
-```
-
-
-```{r}
-# Assuming proportions_both_vote_wave is your dataframe
-data <- proportions_both_vote_wave
-
-# Convert wave to a factor
-data$wave <- as.factor(data$wave)
-
-# Mixed-effects logistic regression
-mixed_model <- glmer(intendedVote ~ econ + env + wave + (1 | participantID), 
-                     family = binomial(link = "logit"), 
-                     data = data)
-
-# Summary of the model
-summary(mixed_model)
-
-#No significant results
-```
 
 
 
