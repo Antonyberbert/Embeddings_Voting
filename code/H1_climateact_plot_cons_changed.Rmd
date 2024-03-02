@@ -1,0 +1,297 @@
+---
+title: "H1_climateact_plot_cons_changed"
+output: html_document
+date: "2024-02-29"
+---
+
+```{r}
+#Install and load necessary packages
+packages <- c("devtools","here","dplyr","tidyverse","readxl","writexl","hunspell","text2vec","car","broom","lme4","RColorBrewer","rstatix","gridExtra","pROC")
+for (package in packages) {
+  if (!requireNamespace(package, quietly = TRUE)) {
+    install.packages(package)
+  }
+}
+lapply(packages,library, character.only=T)
+```
+
+```{r}
+#Barplot of voters that changed vote or stayed consistent showing mean and sd of ECONOMY proportion
+# Data preparation
+data1_econ <- data.frame(
+  BarName = c("no_yes t1", "yes_no t1", "no t1", "yes t1",
+              "no_yes t2", "yes_no t2", "no t2", "yes t2"),
+  Wave = rep(c("t1", "t2"), each = 4),
+  Mean = c(0.43, 0.31, 0.39, 0.38, 0.45, 0.41, 0.44, 0.39),
+  SD = c(0.22, 0.20, 0.19, 0.22, 0.20, 0.22, 0.21, 0.20)
+)
+
+# Simplify BarName for color mapping (remove wave info)
+data1_econ$SimpleBarName <- gsub(" t[12]", "", data1_econ$BarName)
+
+# Add a label for the mean (sd)
+data1_econ$label <- with(data1_econ, paste0(Mean, " (", SD, ")"))
+
+# Choose colorblind-friendly colors
+# Ensure there are enough colors for the unique SimpleBarNames
+colors <- brewer.pal(n = length(unique(data1_econ$SimpleBarName)), name = "Set3")
+
+# Create the plot
+econ_subset_voters_barplot_0.5 <- ggplot(data1_econ, aes(x = BarName, y = Mean, fill = SimpleBarName)) +
+  geom_bar(stat = "identity", position = position_dodge(), color = "black") +
+  geom_errorbar(aes(ymin = Mean - SD, ymax = Mean + SD), width = 0.2, position = position_dodge(0.9)) +
+  geom_text(aes(label = label, y = Mean + SD), vjust = -0.5, position = position_dodge(0.9)) +
+  facet_wrap(~Wave, scales = "free_x") +
+  scale_fill_manual(values = setNames(colors, unique(data1_econ$SimpleBarName))) +
+  labs(title = "Mean and SD of Economy Proportion by Vote and Wave for Subset of Voters at 0.5 Threshold",
+       x = "", y = "Mean Proportion") +
+  theme_minimal() +
+  theme(legend.title = element_blank(), legend.position = "bottom", axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Print the plot
+print(econ_subset_voters_barplot_0.5)
+```
+
+```{r}
+#Barplot of voters that changed vote or stayed consistent showing mean and sd of ECONOMY proportion
+# Data preparation
+data2_econ <- data.frame(
+  BarName = c("no_yes t1", "yes_no t1", "no t1", "yes t1",
+              "no_yes t2", "yes_no t2", "no t2", "yes t2"),
+  Wave = rep(c("t1", "t2"), each = 4),
+  Mean = c(0.18, 0.16, 0.18, 0.20, 0.25, 0.27, 0.24, 0.22),
+  SD = c(0.16, 0.14, 0.13, 0.16, 0.19, 0.20, 0.17, 0.15)
+)
+
+# Simplify BarName for color mapping (remove wave info)
+data2_econ$SimpleBarName <- gsub(" t[12]", "", data2_econ$BarName)
+
+# Add a label for the mean (sd)
+data2_econ$label <- with(data2_econ, paste0(Mean, " (", SD, ")"))
+
+# Choose colorblind-friendly colors
+# Ensure there are enough colors for the unique SimpleBarNames
+colors <- brewer.pal(n = length(unique(data2_econ$SimpleBarName)), name = "Set3")
+
+# Create the plot
+econ_subset_voters_barplot_0.6 <- ggplot(data2_econ, aes(x = BarName, y = Mean, fill = SimpleBarName)) +
+  geom_bar(stat = "identity", position = position_dodge(), color = "black") +
+  geom_errorbar(aes(ymin = Mean - SD, ymax = Mean + SD), width = 0.2, position = position_dodge(0.9)) +
+  geom_text(aes(label = label, y = Mean + SD), vjust = -0.5, position = position_dodge(0.9)) +
+  facet_wrap(~Wave, scales = "free_x") +
+  scale_fill_manual(values = setNames(colors, unique(data2_econ$SimpleBarName))) +
+  labs(title = "Mean and SD of Economy Proportion by Vote and Wave for Subset of Voters at 0.6 Threshold",
+       x = "", y = "Mean Proportion") +
+  theme_minimal() +
+  theme(legend.title = element_blank(), legend.position = "bottom", axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Print the plot
+print(econ_subset_voters_barplot_0.6)
+```
+
+```{r}
+#Barplot of voters that changed vote or stayed consistent showing mean and sd of ECONOMY proportion
+# Data preparation
+data3_econ <- data.frame(
+  BarName = c("no_yes t1", "yes_no t1", "no t1", "yes t1",
+              "no_yes t2", "yes_no t2", "no t2", "yes t2"),
+  Wave = rep(c("t1", "t2"), each = 4),
+  Mean = c(0.09, 0.10, 0.08, 0.09, 0.10, 0.09, 0.10, 0.09),
+  SD = c(0.11, 0.10, 0.09, 0.10, 0.10, 0.08, 0.12, 0.09)
+)
+
+# Simplify BarName for color mapping (remove wave info)
+data3_econ$SimpleBarName <- gsub(" t[12]", "", data3_econ$BarName)
+
+# Add a label for the mean (sd)
+data3_econ$label <- with(data3_econ, paste0(Mean, " (", SD, ")"))
+
+# Choose colorblind-friendly colors
+# Ensure there are enough colors for the unique SimpleBarNames
+colors <- brewer.pal(n = length(unique(data3_econ$SimpleBarName)), name = "Set3")
+
+# Create the plot
+econ_subset_voters_barplot_0.7 <- ggplot(data3_econ, aes(x = BarName, y = Mean, fill = SimpleBarName)) +
+  geom_bar(stat = "identity", position = position_dodge(), color = "black") +
+  geom_errorbar(aes(ymin = Mean - SD, ymax = Mean + SD), width = 0.2, position = position_dodge(0.9)) +
+  geom_text(aes(label = label, y = Mean + SD), vjust = -0.5, position = position_dodge(0.9)) +
+  facet_wrap(~Wave, scales = "free_x") +
+  scale_fill_manual(values = setNames(colors, unique(data3_econ$SimpleBarName))) +
+  labs(title = "Mean and SD of Economy Proportion by Vote and Wave for Subset of Voters at 0.7 Threshold",
+       x = "", y = "Mean Proportion") +
+  theme_minimal() +
+  theme(legend.title = element_blank(), legend.position = "bottom", axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Print the plot
+print(econ_subset_voters_barplot_0.7)
+```
+
+```{r}
+#Barplot of voters that changed vote or stayed consistent showing mean and sd of ENV proportion
+# Data preparation
+data1_env <- data.frame(
+  BarName = c("no_yes t1", "yes_no t1", "no t1", "yes t1",
+              "no_yes t2", "yes_no t2", "no t2", "yes t2"),
+  Wave = rep(c("t1", "t2"), each = 4),
+  Mean = c(0.48, 0.60, 0.47, 0.53, 0.43, 0.53, 0.46, 0.53),
+  SD = c(0.26, 0.16, 0.19, 0.22, 0.16, 0.24, 0.22, 0.19)
+)
+
+# Simplify BarName for color mapping (remove wave info)
+data1_env$SimpleBarName <- gsub(" t[12]", "", data1_env$BarName)
+
+# Add a label for the mean (sd)
+data1_env$label <- with(data1_env, paste0(Mean, " (", SD, ")"))
+
+# Choose colorblind-friendly colors
+# Ensure there are enough colors for the unique SimpleBarNames
+colors <- brewer.pal(n = length(unique(data1_env$SimpleBarName)), name = "Set3")
+
+# Create the plot
+env_subset_voters_barplot_0.5 <- ggplot(data1_env, aes(x = BarName, y = Mean, fill = SimpleBarName)) +
+  geom_bar(stat = "identity", position = position_dodge(), color = "black") +
+  geom_errorbar(aes(ymin = Mean - SD, ymax = Mean + SD), width = 0.2, position = position_dodge(0.9)) +
+  geom_text(aes(label = label, y = Mean + SD), vjust = -0.5, position = position_dodge(0.9)) +
+  facet_wrap(~Wave, scales = "free_x") +
+  scale_fill_manual(values = setNames(colors, unique(data1_env$SimpleBarName))) +
+  labs(title = "Mean and SD of Environmental Protection Proportion by Vote and Wave for Subset of Voters at 0.5 Threshold",
+       x = "", y = "Mean Proportion") +
+  theme_minimal() +
+  theme(legend.title = element_blank(), legend.position = "bottom", axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Print the plot
+print(env_subset_voters_barplot_0.5)
+```
+
+```{r}
+#Barplot of voters that changed vote or stayed consistent showing mean and sd of ENV proportion
+# Data preparation
+data2_env <- data.frame(
+  BarName = c("no_yes t1", "yes_no t1", "no t1", "yes t1",
+              "no_yes t2", "yes_no t2", "no t2", "yes t2"),
+  Wave = rep(c("t1", "t2"), each = 4),
+  Mean = c(0.26, 0.35, 0.26, 0.28, 0.29, 0.22, 0.21, 0.31),
+  SD = c(0.22, 0.17, 0.19, 0.18, 0.21, 0.16, 0.17, 0.19)
+)
+
+# Simplify BarName for color mapping (remove wave info)
+data2_env$SimpleBarName <- gsub(" t[12]", "", data2_env$BarName)
+
+# Add a label for the mean (sd)
+data2_env$label <- with(data2_env, paste0(Mean, " (", SD, ")"))
+
+# Choose colorblind-friendly colors
+# Ensure there are enough colors for the unique SimpleBarNames
+colors <- brewer.pal(n = length(unique(data2_env$SimpleBarName)), name = "Set3")
+
+# Create the plot
+env_subset_voters_barplot_0.6 <- ggplot(data2_env, aes(x = BarName, y = Mean, fill = SimpleBarName)) +
+  geom_bar(stat = "identity", position = position_dodge(), color = "black") +
+  geom_errorbar(aes(ymin = Mean - SD, ymax = Mean + SD), width = 0.2, position = position_dodge(0.9)) +
+  geom_text(aes(label = label, y = Mean + SD), vjust = -0.5, position = position_dodge(0.9)) +
+  facet_wrap(~Wave, scales = "free_x") +
+  scale_fill_manual(values = setNames(colors, unique(data2_env$SimpleBarName))) +
+  labs(title = "Mean and SD of Environmental Protection Proportion by Vote and Wave for Subset of Voters at 0.6 Threshold",
+       x = "", y = "Mean Proportion") +
+  theme_minimal() +
+  theme(legend.title = element_blank(), legend.position = "bottom", axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Print the plot
+print(env_subset_voters_barplot_0.6)
+```
+
+```{r}
+#Barplot of voters that changed vote or stayed consistent showing mean and sd of ENV proportion
+# Data preparation
+data3_env <- data.frame(
+  BarName = c("no_yes t1", "yes_no t1", "no t1", "yes t1",
+              "no_yes t2", "yes_no t2", "no t2", "yes t2"),
+  Wave = rep(c("t1", "t2"), each = 4),
+  Mean = c(0.13, 0.23, 0.12, 0.16, 0.14, 0.17, 0.10, 0.17),
+  SD = c(0.15, 0.14, 0.11, 0.14, 0.14, 0.15, 0.13, 0.15)
+)
+
+# Simplify BarName for color mapping (remove wave info)
+data3_env$SimpleBarName <- gsub(" t[12]", "", data3_env$BarName)
+
+# Add a label for the mean (sd)
+data3_env$label <- with(data3_env, paste0(Mean, " (", SD, ")"))
+
+# Choose colorblind-friendly colors
+# Ensure there are enough colors for the unique SimpleBarNames
+colors <- brewer.pal(n = length(unique(data3_env$SimpleBarName)), name = "Set3")
+
+# Create the plot
+env_subset_voters_barplot_0.7 <- ggplot(data3_env, aes(x = BarName, y = Mean, fill = SimpleBarName)) +
+  geom_bar(stat = "identity", position = position_dodge(), color = "black") +
+  geom_errorbar(aes(ymin = Mean - SD, ymax = Mean + SD), width = 0.2, position = position_dodge(0.9)) +
+  geom_text(aes(label = label, y = Mean + SD), vjust = -0.5, position = position_dodge(0.9)) +
+  facet_wrap(~Wave, scales = "free_x") +
+  scale_fill_manual(values = setNames(colors, unique(data3_env$SimpleBarName))) +
+  labs(title = "Mean and SD of Environmental Protection Proportion by Vote and Wave for Subset of Voters at 0.7 Threshold",
+       x = "", y = "Mean Proportion") +
+  theme_minimal() +
+  theme(legend.title = element_blank(), legend.position = "bottom", axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Print the plot
+print(env_subset_voters_barplot_0.7)
+```
+
+```{r}
+# Add a 'Threshold' column to each dataset
+data1_econ$Threshold <- "0.5"
+data2_econ$Threshold <- "0.6"
+data3_econ$Threshold <- "0.7"
+
+data1_env$Threshold <- "0.5"
+data2_env$Threshold <- "0.6"
+data3_env$Threshold <- "0.7"
+
+# Merge the datasets into one
+  combined_data_econ <- bind_rows(data1_econ, data2_econ, data3_econ)
+
+# Create the plot with a corrected legend title
+combined_plot_econ <- ggplot(combined_data_econ, aes(x = BarName, y = Mean, fill = gsub(" t[12]", "", BarName))) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.8), color = "black") +
+  geom_errorbar(aes(ymin = Mean - SD, ymax = Mean + SD), width = 0.2, position = position_dodge(width = 0.8)) +
+  geom_text(aes(label = paste0(Mean, " (", SD, ")"), y = Mean + SD + 0.03), 
+            vjust = 0, position = position_dodge(width = 0.8), size = 3, angle = 45) +
+  scale_fill_brewer(palette = "Set3", name = "Vote Change") +  # Set the legend title here
+  facet_wrap(~Threshold, scales = "free_x", ncol = 3) +
+  labs(title = "Mean and SD of Economy Proportion by Vote and Wave for Subset of Voters by Threshold",
+       x = "", y = "Mean Proportion") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1), 
+        legend.position = "bottom",
+        strip.text.x = element_text(size = 10))
+
+# Print the combined plot
+print(combined_plot_econ)
+
+ggsave(here::here("plot","econ_subset_3.png"), plot = combined_plot_econ, width = 16, height = 10, dpi = 300, bg = "transparent")
+```
+
+```{r}
+# Merge the datasets into one
+combined_data_env <- bind_rows(data1_env, data2_env, data3_env)
+
+# Create the plot
+combined_plot_env <- ggplot(combined_data_env, aes(x = BarName, y = Mean, fill = gsub(" t[12]", "", BarName))) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.8), color = "black") +
+  geom_errorbar(aes(ymin = Mean - SD, ymax = Mean + SD), width = 0.2, position = position_dodge(width = 0.8)) +
+  geom_text(aes(label = paste0(Mean, " (", SD, ")"), y = Mean + SD + 0.03), 
+            vjust = 0, position = position_dodge(width = 0.8), size = 3, angle = 45) +
+  scale_fill_brewer(palette = "Set3", name = "Vote Change") +  # Set the legend title here
+  facet_wrap(~Threshold, scales = "free_x", ncol = 3) +
+  labs(title = "Mean and SD of Environmental Protection Proportion by Vote and Wave for Subset of Voters by Threshold",
+       x = "", y = "Mean Proportion") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1), 
+        legend.position = "bottom",
+        strip.text.x = element_text(size = 10))
+
+# Print the combined plot
+print(combined_plot_env)
+
+ggsave(here::here("plot","env_subset_3.png"), plot = combined_plot_env, width = 16, height = 10, dpi = 300, bg = "transparent")
+```

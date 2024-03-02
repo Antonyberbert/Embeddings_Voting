@@ -347,3 +347,30 @@ vif_values <- vif(simplified_model)
 print(vif_values)
 ```
 
+```{r}
+#Check model fit by comparing to null model (AIC, BIC, LR)
+# Fit the null model with random intercepts for participantID
+null_model <- glmer(fintendedVote ~ 1 + (1 | participantID), 
+                    data = energyact_fin_both, 
+                    family = binomial)
+
+# Summarize the null model to get AIC and BIC
+summary(null_model)
+
+# Now compare the AIC and BIC of your full model to the null model
+aic_full <- AIC(model_H1_with_wave)
+aic_null <- AIC(null_model)
+
+bic_full <- BIC(model_H1_with_wave)
+bic_null <- BIC(null_model)
+
+# Print the AIC and BIC for full and null models to compare
+print(paste("Full model AIC:", aic_full, "Null model AIC:", aic_null))
+print(paste("Full model BIC:", bic_full, "Null model BIC:", bic_null))
+
+#Likelihood Ratio Test
+anova(null_model, model_H1_with_wave)
+#Chisq 19.268, Df 3, p < .001
+```
+
+

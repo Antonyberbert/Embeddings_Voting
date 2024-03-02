@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 #Install and load necessary packages
-packages <- c("devtools","here","dplyr","tidyverse","readxl","writexl","hunspell","text2vec","car","broom","lme4","RColorBrewer","rstatix")
+packages <- c("devtools","here","dplyr","tidyverse","readxl","writexl","hunspell","text2vec","car","broom","lme4","RColorBrewer","rstatix","pROC")
 for (package in packages) {
   if (!requireNamespace(package, quietly = TRUE)) {
     install.packages(package)
@@ -162,6 +162,46 @@ energyact_fin_both <- energyact_fin %>%
 # Check the structure of the new dataframe
 str(energyact_fin_both)
 ```
+```{r}
+#Manual categorization to check validity
+# Step 1: Sample 50 random rows and select 'word' and 'category'
+set.seed(30)
+
+sampled_data <- energyact_fin_both %>%
+  sample_n(50) %>%
+  select(word, category)
+
+# Step 2: Add a new column for manual categorization. Initially, it can be NA or a default value.
+# Here I'm setting it to NA. You'll need to replace NAs with your manual categories.
+sampled_data$manual_cat <- NA
+
+# Export to CSV
+write_xlsx(sampled_data %>% select(word, manual_cat), here("data","manual_cat.xlsx"))
+
+# After manual editing, read the updated CSV back into R
+#save the xlsx file as manual_cat_done!
+# Make sure 'sampled_data' does not include a 'manual_cat' column
+# Only select 'word' and 'category' columns to ensure this
+sampled_data <- sampled_data %>% select(word, category)
+
+# Now, read the manually categorized data, ensuring it has 'word' and 'manual_cat' columns
+manual_cat <- read_xlsx(here("data", "manual_cat_done.xlsx"))
+
+# Merge 'sampled_data' with 'manual_cat' by 'word', bringing in only the 'manual_cat' column from 'manual_cat'
+sampled_data_with_manual_cat <- merge(sampled_data, manual_cat, by = "word")
+
+# Calculate the match ratio
+# This calculates the proportion of rows where 'category' matches 'manual_cat'
+match_ratio <- mean(sampled_data_with_manual_cat$category == sampled_data_with_manual_cat$manual_cat, na.rm = TRUE)
+
+# Print the match ratio
+print(match_ratio)
+
+# Filter and print non-matching rows
+non_matching_rows <- sampled_data_with_manual_cat[sampled_data_with_manual_cat$category != sampled_data_with_manual_cat$manual_cat, ]
+print(non_matching_rows)
+```
+
 
 ```{r}
 # Calculate the count of each category per participant
@@ -406,7 +446,119 @@ summary_by_wave_vote <- proportions_both_vote_wave %>%
 print(summary_by_wave_vote)
 ```
 
+```{r}
+# Calculate mean and SD by wave and intendedVote for consistent participants
+summary_by_wave_vote_cons <- proportions_both_vote_wave_cons %>%
+  group_by(wave, intendedVote) %>%
+  summarise(across(c(econ, env, rest), list(mean = ~mean(., na.rm = TRUE), 
+                                            sd = ~sd(., na.rm = TRUE))))
 
+print(summary_by_wave_vote_cons)
+```
+
+```{r}
+# Step 1: Identify participants that changed their vote from t1 to t2
+participant_changes <- proportions_both_vote_wave %>%
+  group_by(participantID) %>%
+  filter(n() == 2) %>% # Ensure we have both t1 and t2 for each participant
+  summarise(vote_change = n_distinct(intendedVote) > 1) %>%
+  filter(vote_change) %>%
+  select(participantID)
+
+# Step 2: Create a dataframe with only those participants that changed their vote
+changed_vote_df <- proportions_both_vote_wave %>%
+  semi_join(participant_changes, by = "participantID")
+
+# Step 3: Calculate mean and sd for participants based on intendedVote and wave
+results <- changed_vote_df %>%
+  group_by(wave, intendedVote) %>%
+  summarise(mean_econ = mean(econ, na.rm = TRUE),
+            sd_econ = sd(econ, na.rm = TRUE),
+            mean_env = mean(env, na.rm = TRUE),
+            sd_env = sd(env, na.rm = TRUE)) %>%
+  ungroup()
+
+# Display the results
+print(results)
+```
+
+```{r}
+#Barplot of voters that changed vote or stayed consistent showing mean and sd of ECONOMY proportion
+# Data preparation
+data <- data.frame(
+  BarName = c("no_yes t1", "yes_no t1", "no t1", "yes t1",
+              "no_yes t2", "yes_no t2", "no t2", "yes t2"),
+  Wave = rep(c("t1", "t2"), each = 4),
+  Mean = c(0.09, 0.10, 0.08, 0.09, 0.10, 0.09, 0.10, 0.09),
+  SD = c(0.11, 0.10, 0.09, 0.10, 0.10, 0.08, 0.12, 0.09)
+)
+
+# Simplify BarName for color mapping (remove wave info)
+data$SimpleBarName <- gsub(" t[12]", "", data$BarName)
+
+# Add a label for the mean (sd)
+data$label <- with(data, paste0(Mean, " (", SD, ")"))
+
+# Choose colorblind-friendly colors
+# Ensure there are enough colors for the unique SimpleBarNames
+colors <- brewer.pal(n = length(unique(data$SimpleBarName)), name = "Set3")
+
+# Create the plot
+econ_subset_voters_barplot <- ggplot(data, aes(x = BarName, y = Mean, fill = SimpleBarName)) +
+  geom_bar(stat = "identity", position = position_dodge(), color = "black") +
+  geom_errorbar(aes(ymin = Mean - SD, ymax = Mean + SD), width = 0.2, position = position_dodge(0.9)) +
+  geom_text(aes(label = label, y = Mean + SD), vjust = -0.5, position = position_dodge(0.9)) +
+  facet_wrap(~Wave, scales = "free_x") +
+  scale_fill_manual(values = setNames(colors, unique(data$SimpleBarName))) +
+  labs(title = "Mean and SD of Economy Proportion by Vote and Wave for Subset of Voters at 0.7 Threshold",
+       x = "", y = "Mean Proportion") +
+  theme_minimal() +
+  theme(legend.title = element_blank(), legend.position = "bottom", axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Print the plot
+print(econ_subset_voters_barplot)
+
+ggsave(here::here("plot","H1_0.7","econ_subset_voters_barplot.png"), plot = econ_subset_voters_barplot, width = 10, height = 8, dpi = 300, bg = "transparent")
+```
+
+```{r}
+#Barplot of voters that changed vote or stayed consistent showing mean and sd of ENV proportion
+# Data preparation
+data <- data.frame(
+  BarName = c("no_yes t1", "yes_no t1", "no t1", "yes t1",
+              "no_yes t2", "yes_no t2", "no t2", "yes t2"),
+  Wave = rep(c("t1", "t2"), each = 4),
+  Mean = c(0.13, 0.23, 0.12, 0.16, 0.14, 0.17, 0.10, 0.17),
+  SD = c(0.15, 0.14, 0.11, 0.14, 0.14, 0.15, 0.13, 0.15)
+)
+
+# Simplify BarName for color mapping (remove wave info)
+data$SimpleBarName <- gsub(" t[12]", "", data$BarName)
+
+# Add a label for the mean (sd)
+data$label <- with(data, paste0(Mean, " (", SD, ")"))
+
+# Choose colorblind-friendly colors
+# Ensure there are enough colors for the unique SimpleBarNames
+colors <- brewer.pal(n = length(unique(data$SimpleBarName)), name = "Set3")
+
+# Create the plot
+env_subset_voters_barplot <- ggplot(data, aes(x = BarName, y = Mean, fill = SimpleBarName)) +
+  geom_bar(stat = "identity", position = position_dodge(), color = "black") +
+  geom_errorbar(aes(ymin = Mean - SD, ymax = Mean + SD), width = 0.2, position = position_dodge(0.9)) +
+  geom_text(aes(label = label, y = Mean + SD), vjust = -0.5, position = position_dodge(0.9)) +
+  facet_wrap(~Wave, scales = "free_x") +
+  scale_fill_manual(values = setNames(colors, unique(data$SimpleBarName))) +
+  labs(title = "Mean and SD of Environmental Protection Proportion by Vote and Wave for Subset of Voters at 0.7 Threshold",
+       x = "", y = "Mean Proportion") +
+  theme_minimal() +
+  theme(legend.title = element_blank(), legend.position = "bottom", axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Print the plot
+print(env_subset_voters_barplot)
+
+ggsave(here::here("plot","H1_0.7","env_subset_voters_barplot.png"), plot = env_subset_voters_barplot, width = 10, height = 8, dpi = 300, bg = "transparent")
+```
 
 ```{r}
 #Calculate how many participants changed their vote from t1 to t2
@@ -759,6 +911,22 @@ print(list(
 wilcox_effsize(proportions_both_vote_wave, econ~wave,paired=T)
 #r=0.17
 ```
+```{r}
+#Checking Symmetry assumption for signed-rank test
+# Assuming proportions_both_vote_wave is your data frame and econ/env are your variables
+# Calculate differences between t1 and t2 for econ and env
+differences_econ <- proportions_both_vote_wave$econ[proportions_both_vote_wave$wave == "t1"] - 
+                    proportions_both_vote_wave$econ[proportions_both_vote_wave$wave == "t2"]
+
+differences_env <- proportions_both_vote_wave$env[proportions_both_vote_wave$wave == "t1"] - 
+                   proportions_both_vote_wave$env[proportions_both_vote_wave$wave == "t2"]
+
+# Visual inspection using histograms
+par(mfrow=c(2,1)) # Plotting two plots in one window
+hist(differences_econ, main="Differences in Econ", xlab="Difference", breaks=20)
+hist(differences_env, main="Differences in Env", xlab="Difference", breaks=20)
+```
+
 
 ```{r}
 #Boxplots & paired data of t1 & t2 across voters
@@ -893,6 +1061,35 @@ if (median_env_t1 < median_env_t2) {
 }
 
 wilcox_effsize(data_vote_0, env~wave,paired=T)
+```
+
+```{r}
+#Plotting difference histograms to check symmetry assumption of signed-rank tests
+# Assuming that 'proportions_both_vote_wave_cons' is your dataframe
+# and that 'env' and 'econ' are the names of the variables of interest.
+
+# Calculate the differences for 'env' and 'econ' between t1 and t2 for IntendedVote = 0
+env_diff_0 <- with(subset(proportions_both_vote_wave_cons, intendedVote == 0),
+                  env[wave == "t1"] - env[wave == "t2"])
+econ_diff_0 <- with(subset(proportions_both_vote_wave_cons, intendedVote == 0),
+                   econ[wave == "t1"] - econ[wave == "t2"])
+
+# Calculate the differences for 'env' and 'econ' between t1 and t2 for IntendedVote = 1
+env_diff_1 <- with(subset(proportions_both_vote_wave_cons, intendedVote == 1),
+                  env[wave == "t1"] - env[wave == "t2"])
+econ_diff_1 <- with(subset(proportions_both_vote_wave_cons, intendedVote == 1),
+                   econ[wave == "t1"] - econ[wave == "t2"])
+
+# Plot the histograms
+par(mfrow=c(2,2)) # Setting up the plotting area for 4 plots
+
+# Plotting for IntendedVote = 0
+hist(env_diff_0, main="Differences in Env (Vote=0)", xlab="Difference", col="gray")
+hist(econ_diff_0, main="Differences in Econ (Vote=0)", xlab="Difference", col="gray")
+
+# Plotting for IntendedVote = 1
+hist(env_diff_1, main="Differences in Env (Vote=1)", xlab="Difference", col="gray")
+hist(econ_diff_1, main="Differences in Econ (Vote=1)", xlab="Difference", col="gray")
 ```
 
 ```{r}
@@ -1186,6 +1383,23 @@ ggplot(energyact_fin_summary, aes(x = env, y = log_odds)) +
   geom_smooth(method = "loess", color = "red") +
   labs(title = "Log-Odds vs Env", x = "Environmental Predictor", y = "Log-Odds of Intended Vote")
 ```
+
+```{r}
+# Calculate predicted probabilities
+predicted_probabilities <- predict(model_all_glm, type = "response")
+
+# Calculate the ROC curve
+roc_curve <- roc(energyact_fin_summary$fintendedVote, predicted_probabilities)
+
+# Calculate the AUC
+auc_value <- auc(roc_curve)
+print(paste("Area under the ROC curve (AUC):", auc_value))
+
+# Plot the ROC curve
+plot(roc_curve, main="ROC Curve")
+abline(a=0, b= 1, col="red")
+```
+
 ```{r}
 #Logistic regression with wave
 proportions_both_vote_wave$fwave <- as.factor(proportions_both_vote_wave$wave)
