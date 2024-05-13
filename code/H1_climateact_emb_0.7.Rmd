@@ -912,6 +912,42 @@ wilcox_effsize(proportions_both_vote_wave, econ~wave,paired=T)
 #r=0.17
 ```
 ```{r}
+# Function adjusted to extract n directly from the test inputs
+create_signed_rank_test_row <- function(test_result, variable_name, group_name) {
+  n <- length(test_result$data) / 2 # Since data is a concatenated list of both groups
+  v_statistic <- test_result$statistic
+  p_value <- test_result$p.value
+  
+  # Return a tibble row
+  tibble(
+    Variable = variable_name,
+    Group = group_name,
+    N = n,
+    V = v_statistic,
+    P_Value = p_value
+  )
+}
+
+# Assuming data_vote_0 and data_vote_1 are predefined data frames for IntendedVote=0 and IntendedVote=1
+# Applying the function to each test result
+rows <- list(
+  create_signed_rank_test_row(econ_test_overall, "Econ", "Overall"),
+  create_signed_rank_test_row(env_test_overall, "Env", "Overall"),
+  create_signed_rank_test_row(env_test_0, "Env", "IntendedVote=0"),
+  create_signed_rank_test_row(econ_test_0, "Econ", "IntendedVote=0"),
+  create_signed_rank_test_row(env_test_1, "Env", "IntendedVote=1"),
+  create_signed_rank_test_row(econ_test_1, "Econ", "IntendedVote=1")
+)
+
+# Combining all rows into one table
+results_table <- bind_rows(rows)
+
+# Printing the results table
+print(results_table)
+```
+
+
+```{r}
 #Checking Symmetry assumption for signed-rank test
 # Assuming proportions_both_vote_wave is your data frame and econ/env are your variables
 # Calculate differences between t1 and t2 for econ and env
@@ -1061,6 +1097,9 @@ if (median_env_t1 < median_env_t2) {
 }
 
 wilcox_effsize(data_vote_0, env~wave,paired=T)
+wilcox_effsize(data_vote_0, econ~wave,paired=T)
+wilcox_effsize(data_vote_1, env~wave,paired=T)
+wilcox_effsize(data_vote_1, econ~wave,paired=T)
 ```
 
 ```{r}
@@ -1186,6 +1225,57 @@ wilcox_effsize(proportions_both_vote_wave, env~intendedVote, ref.group = "1",det
 wilcox_effsize(data_t1_all, env~intendedVote, ref.group = "1",detailed=T,alternative="greater")
 
 wilcox_effsize(data_t2_all, env~intendedVote, ref.group = "1",detailed=T,alternative="greater")
+```
+```{r}
+# Adjusted function to include n1 and n2
+calculate_rank_sums <- function(group1, group2, variable_name) {
+  test_result <- wilcox.test(group1, group2, alternative="greater", conf.int = TRUE)
+  w_statistic <- test_result$statistic
+  n1 <- length(group1)
+  n2 <- length(group2)
+  total_rank_sum <- (n1 + n2) * (n1 + n2 + 1) / 2
+  rank_sum_group1 <- w_statistic
+  rank_sum_group2 <- total_rank_sum - w_statistic
+  # Return a dataframe row
+  tibble(
+    Variable = variable_name,
+    n1 = n1,
+    n2 = n2,
+    Rank_Sum_Group_1 = rank_sum_group1,
+    Rank_Sum_Group_2 = rank_sum_group2,
+    P_Value = test_result$p.value
+  )
+}
+
+# List of test cases
+test_cases <- list(
+  econ_all = list(group1 = proportions_both_vote_wave$econ[proportions_both_vote_wave$intendedVote==0],
+                  group2 = proportions_both_vote_wave$econ[proportions_both_vote_wave$intendedVote==1],
+                  name = "Econ All"),
+  env_all = list(group1 = proportions_both_vote_wave$env[proportions_both_vote_wave$intendedVote==1],
+                 group2 = proportions_both_vote_wave$env[proportions_both_vote_wave$intendedVote==0],
+                 name = "Env All"),
+  econ_t1 = list(group1 = data_t1_all$econ[data_t1_all$intendedVote==0],
+                 group2 = data_t1_all$econ[data_t1_all$intendedVote==1],
+                 name = "Econ T1"),
+  env_t1 = list(group1 = data_t1_all$env[data_t1_all$intendedVote==1],
+                group2 = data_t1_all$env[data_t1_all$intendedVote==0],
+                name = "Env T1"),
+  econ_t2 = list(group1 = data_t2_all$econ[data_t2_all$intendedVote==0],
+                 group2 = data_t2_all$econ[data_t2_all$intendedVote==1],
+                 name = "Econ T2"),
+  env_t2 = list(group1 = data_t2_all$env[data_t2_all$intendedVote==1],
+                group2 = data_t2_all$env[data_t2_all$intendedVote==0],
+                name = "Env T2")
+)
+
+# Applying the function to each test case and combining results
+results_table <- bind_rows(lapply(test_cases, function(case) {
+  calculate_rank_sums(case$group1, case$group2, case$name)
+}))
+
+# Printing the results table
+print(results_table)
 ```
 
 ```{r}
@@ -1333,13 +1423,25 @@ model_all_glm <- glm(fintendedVote ~ econ + env,
                      family = binomial, data = energyact_fin_summary)
 
 # Displaying the summary of the model
-summary(model_all_glm)
+summary_model <- summary(model_all_glm)
 
+# Calculate the 95% confidence intervals for the estimates
+ci <- confint.default(model_all_glm)
+
+# Add the confidence intervals to the summary table
+summary_model$coefficients <- cbind(summary_model$coefficients, "Lower 95% CI" = ci[, 1], "Upper 95% CI" = ci[, 2])
+
+# Display the summary with confidence intervals
+print(summary_model)
+
+# Calculate and print the odds ratio for 'env'
 odds_ratio_env <- exp(coef(model_all_glm)["env"])
-odds_ratio_env
 print(paste("Odds ratio of Env =", odds_ratio_env))
+
+# Calculate the odds ratio per word change (1/8)
 per_word_or <- odds_ratio_env^0.125
 print(paste("Odds ratio of Env per word change (1/8) =", per_word_or))
+
 ```
 ```{r}
 # Adding squared terms for continuous predictors
@@ -1396,7 +1498,7 @@ auc_value <- auc(roc_curve)
 print(paste("Area under the ROC curve (AUC):", auc_value))
 
 # Plot the ROC curve
-plot(roc_curve, main="ROC Curve")
+auc_plot_0.7 <- plot(roc_curve, main="ROC Curve")
 abline(a=0, b= 1, col="red")
 ```
 

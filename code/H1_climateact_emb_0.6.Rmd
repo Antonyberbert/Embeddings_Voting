@@ -12,7 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 #Install and load necessary packages
-packages <- c("devtools","here","dplyr","tidyverse","readxl","writexl","hunspell","text2vec","car","broom","lme4","RColorBrewer","rstatix","gridExtra","pROC")
+packages <- c("devtools","here","dplyr","tidyverse","readxl","writexl","hunspell","text2vec","car","broom","lme4","RColorBrewer","rstatix","gridExtra","pROC","ggalluvial")
 for (package in packages) {
   if (!requireNamespace(package, quietly = TRUE)) {
     install.packages(package)
@@ -306,8 +306,6 @@ medians_by_vote_and_category <- combined_similarity_data_facet %>%
 combined_similarity_plot_facet <- ggplot(combined_similarity_data_facet, aes(x = entry, y = max_similarity, color = category)) +
   geom_point() +
   geom_hline(data = medians_by_vote_and_category, aes(yintercept = median_value, color = category), linetype = "dashed") +
-  geom_text(data = medians_by_vote_and_category, aes(label = paste("Median:", round(median_value, 2)), y = median_value, color = category), 
-            x = Inf, hjust = 1.1, vjust = 0, size = 3) + # x = Inf to align text to the right
   scale_color_manual(values = c("Economy" = "#56B4E9", "Environmental Protection" = "#E69F00")) +
   labs(title = "Similarity Distribution by Intended Vote", x = "Entries", y = "Max Similarity") +
   theme_classic() +
@@ -320,7 +318,7 @@ combined_similarity_plot_facet <- ggplot(combined_similarity_data_facet, aes(x =
 print(combined_similarity_plot_facet)
 
 # Save the plot
-ggsave(here::here("plot","similarity_dis","similarity_dis","combined_similarity_plot_facet.png"), plot = combined_similarity_plot_facet, width = 10, height = 8, dpi = 300, bg = "transparent")
+ggsave(here::here("plot","similarity_dis","similarity_dis","combined_similarity_plot_facet.png"), plot = combined_similarity_plot_facet, width = 10, height = 8, dpi = 600, bg = "transparent")
 
 ```
 
@@ -385,22 +383,28 @@ colors <- brewer.pal(6, "Dark2")
 # Prepare a combined category for the legend
 data$Category <- with(data, paste(Threshold, Vote, sep = "_"))
 
+# Correct order for the legend
+legend_order <- c("0.5_no", "0.6_no", "0.7_no", "0.5_yes", "0.6_yes", "0.7_yes")
+
 # Plot
 desc_across_vote_thresholds_econ <- ggplot(data, aes(x = Vote, y = Mean, fill = Category)) +
   geom_bar(stat = "identity", position = position_dodge(), color = "black") +
   geom_errorbar(aes(ymin = Mean - SD, ymax = Mean + SD), width = 0.2, position = position_dodge(0.9)) +
   geom_text(aes(label = label, y = Mean + SD), vjust = -0.5, position = position_dodge(0.9)) +
-  scale_fill_manual(values = colors) +
+  scale_fill_manual(values = colors, breaks = legend_order) +
+   scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.2)) + # Adjust the y-axis range
   facet_wrap(~Threshold, scales = "free_x", ncol = 3) +
-  labs(title = "Mean and SD of Economy Proportion, by Threshold and Intended Vote",
-       x = "Condition by Threshold", y = "Mean Proportion") +
+  labs(title = "Mean and Standard Deviation of Economy Proportion, by Threshold and Intended Vote",
+       x = "Voting Intention by Threshold", y = "Mean Proportion") +
   theme_minimal() +
-  theme(legend.title = element_blank(), legend.position = "bottom", axis.text.x = element_text(angle = 45, hjust = 1))
+  theme(legend.title = element_blank(), legend.position = "bottom", axis.text.x = element_text(angle = 0, hjust = 1),
+        panel.grid = element_blank()) +
+  guides(fill = guide_legend(nrow = 3, ncol = 2)) # Adjusts the legend to have 3 rows and 2 columns
 
 # Print the plot
 print(desc_across_vote_thresholds_econ)
 
-ggsave(here::here("plot","desc_across_vote_thresholds_econ.png"), plot = desc_across_vote_thresholds_econ, width = 10, height = 10, dpi = 300, bg = "transparent")
+ggsave(here::here("plot","desc_across_vote_thresholds_econ.png"), plot = desc_across_vote_thresholds_econ, width = 10, height = 10, dpi = 800, bg = "transparent")
 ```
 
 ```{r}
@@ -421,23 +425,29 @@ colors <- brewer.pal(6, "Dark2")
 # Prepare a combined category for the legend
 data$Category <- with(data, paste(Threshold, Vote, sep = "_"))
 
+# Correct order for the legend
+legend_order <- c("0.5_no", "0.6_no", "0.7_no", "0.5_yes", "0.6_yes", "0.7_yes")
+
 # Plot
 desc_across_vote_thresholds_env <- ggplot(data, aes(x = Vote, y = Mean, fill = Category)) +
   geom_bar(stat = "identity", position = position_dodge(), color = "black") +
   geom_errorbar(aes(ymin = Mean - SD, ymax = Mean + SD), width = 0.2, position = position_dodge(0.9)) +
   geom_text(aes(label = label, y = Mean + SD), vjust = -0.5, position = position_dodge(0.9)) +
-  scale_fill_manual(values = colors) +
+  scale_fill_manual(values = colors, breaks = legend_order) +
+     scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.2)) + # Adjust the y-axis range
   facet_wrap(~Threshold, scales = "free_x", ncol = 3) +
-  labs(title = "Mean and SD of Environmental Protection Proportion, by Threshold and Intended Vote",
-       x = "Condition by Threshold", y = "Mean Proportion") +
+  labs(title = "Mean and Standard Deviation of Environmental Protection Proportion, by Threshold and Intended Vote",
+       x = "Voting Intention by Threshold", y = "Mean Proportion") +
   theme_minimal() +
-  theme(legend.title = element_blank(), legend.position = "bottom", axis.text.x = element_text(angle = 45, hjust = 1))
+  theme(legend.title = element_blank(), legend.position = "bottom", axis.text.x = element_text(angle = 0, hjust = 1),
+        panel.grid = element_blank()) +
+  guides(fill = guide_legend(nrow = 3, ncol = 2)) # Adjusts the legend to have 3 rows and 2 columns
 
 
 # Print the plot
 print(desc_across_vote_thresholds_env)
 
-ggsave(here::here("plot","desc_across_vote_thresholds_env.png"), plot = desc_across_vote_thresholds_env, width = 10, height = 10, dpi = 300, bg = "transparent")
+ggsave(here::here("plot","desc_across_vote_thresholds_env.png"), plot = desc_across_vote_thresholds_env, width = 10, height = 10, dpi = 800, bg = "transparent")
 ```
 
 ```{r}
@@ -750,11 +760,10 @@ env_subset_voters_barplot <- ggplot(data, aes(x = BarName, y = Mean, fill = Simp
 # Print the plot
 print(env_subset_voters_barplot)
 
-ggsave(here::here("plot","env_subset_voters_barplot.png"), plot = env_subset_voters_barplot, width = 10, height = 8, dpi = 300, bg = "transparent")
+ggsave(here::here("plot","env_subset_voters_barplot.png"), plot = env_subset_voters_barplot, width = 10, height = 8, dpi = 600, bg = "transparent")
 ```
 
 ```{r}
-#Plot Mean and SD of Economy Proportion by Vote, Wave, and Threshold for All Participants
 # Data frame with all the necessary information
 data <- data.frame(
   Threshold = rep(c("0.5", "0.6", "0.7"), each = 4),
@@ -771,26 +780,40 @@ data$Group <- with(data, paste(Threshold, Condition, sep = "_"))
 data$label <- with(data, paste0(Mean, " (", SD, ")"))
 
 # Create a colorblind-friendly palette for "no" and "yes" conditions
-colors <- c("0.5_no" = "lightblue", "0.5_yes" = "lightcoral",
-            "0.6_no" = "skyblue", "0.6_yes" = "salmon",
-            "0.7_no" = "steelblue", "0.7_yes" = "darksalmon")
+colors <- brewer.pal(6, "Dark2")
 
-# Create the plot
+legend_order <- c("0.5_no", "0.6_no", "0.7_no", "0.5_yes", "0.6_yes", "0.7_yes")
+
+# Adjust the dodge width to ensure consistent spacing between bars and their labels
+dodge_width <- 0.9
+
+# Create the plot with the specified y-limits from 0 to 1
 econ_wave_vote_threshold <- ggplot(data, aes(x = Type, y = Mean, fill = Group)) +
-  geom_bar(stat = "identity", position = position_dodge(), color = "black") +
-  geom_errorbar(aes(ymin = Mean - SD, ymax = Mean + SD), width = 0.25, position = position_dodge(0.9)) +
-  geom_text(aes(label = label, y = Mean + SD), vjust = -0.5, position = position_dodge(0.9)) +
+  geom_bar(stat = "identity", position = position_dodge(dodge_width), color = "black") +
+  geom_errorbar(
+    aes(ymin = pmax(Mean - SD, 0), ymax = pmin(Mean + SD, 1)), # Ensure error bars stay within 0 to 1
+    width = 0.25,
+    position = position_dodge(dodge_width)
+  ) +
+  geom_text(
+    aes(label = label, y = pmin(Mean + SD, 1)), # Adjust text position to not exceed y of 1
+    vjust = -0.5, size = 3.5,
+    position = position_dodge(1)
+  ) +
+  scale_fill_manual(values = colors, breaks = legend_order) +
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.2)) + # Fixed limits from 0 to 1
   facet_wrap(~Threshold, scales = "free_x") +
-  scale_fill_manual(values = colors) +
-  labs(title = "Mean and SD of Economy Proportion by Vote, Wave, and Threshold",
-       x = "", y = "Mean Proportion") +
+  labs(title = "Mean and Standard Deviation of Economy Proportion by Vote, Wave, and Threshold",
+       x = "Voting Intention by Wave and Threshold", y = "Mean Proportion") +
   theme_minimal() +
-  theme(legend.title = element_blank(), legend.position = "bottom", axis.text.x = element_text(angle = 45, hjust = 1))
+  theme(legend.title = element_blank(), legend.position = "bottom", axis.text.x = element_text(angle = 0, hjust = 1),
+        panel.grid = element_blank()) +
+  guides(fill = guide_legend(nrow = 3, ncol = 2))
 
 # Print the plot
 print(econ_wave_vote_threshold)
 
-ggsave(here::here("plot","econ_wave_vote_threshold.png"), plot = econ_wave_vote_threshold, width = 10, height = 8, dpi = 300, bg = "transparent")
+ggsave(here::here("plot","econ_wave_vote_threshold.png"), plot = econ_wave_vote_threshold, width = 10, height = 10, dpi = 1000, bg = "transparent")
 ```
 
 ```{r}
@@ -811,26 +834,40 @@ data$Group <- with(data, paste(Threshold, Condition, sep = "_"))
 data$label <- with(data, paste0(Mean, " (", SD, ")"))
 
 # Create a colorblind-friendly palette for "no" and "yes" conditions
-colors <- c("0.5_no" = "lightblue", "0.5_yes" = "lightcoral",
-            "0.6_no" = "skyblue", "0.6_yes" = "salmon",
-            "0.7_no" = "steelblue", "0.7_yes" = "darksalmon")
+colors <- brewer.pal(6, "Dark2")
 
-# Create the plot
+legend_order <- c("0.5_no", "0.6_no", "0.7_no", "0.5_yes", "0.6_yes", "0.7_yes")
+
+# Adjust the dodge width to ensure consistent spacing between bars and their labels
+dodge_width <- 0.9
+
+# Create the plot with the specified y-limits from 0 to 1
 env_wave_vote_threshold <- ggplot(data, aes(x = Type, y = Mean, fill = Group)) +
-  geom_bar(stat = "identity", position = position_dodge(), color = "black") +
-  geom_errorbar(aes(ymin = Mean - SD, ymax = Mean + SD), width = 0.25, position = position_dodge(0.9)) +
-  geom_text(aes(label = label, y = Mean + SD), vjust = -0.5, position = position_dodge(0.9)) +
+  geom_bar(stat = "identity", position = position_dodge(dodge_width), color = "black") +
+  geom_errorbar(
+    aes(ymin = pmax(Mean - SD, 0), ymax = pmin(Mean + SD, 1)), # Ensure error bars stay within 0 to 1
+    width = 0.25,
+    position = position_dodge(dodge_width)
+  ) +
+  geom_text(
+    aes(label = label, y = pmin(Mean + SD, 1)), # Adjust text position to not exceed y of 1
+    vjust = -0.5, size = 3.5,
+    position = position_dodge(1)
+  ) +
+  scale_fill_manual(values = colors, breaks = legend_order) +
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.2)) + # Fixed limits from 0 to 1
   facet_wrap(~Threshold, scales = "free_x") +
-  scale_fill_manual(values = colors) +
-  labs(title = "Mean and SD of Environmental Protection Proportion by Vote, Wave, and Threshold",
-       x = "", y = "Mean Proportion") +
+  labs(title = "Mean and Standard Deviation of Environmental Protection Proportion by Vote, Wave, and Threshold",
+       x = "Voting Intention by Wave and Threshold", y = "Mean Proportion") +
   theme_minimal() +
-  theme(legend.title = element_blank(), legend.position = "bottom", axis.text.x = element_text(angle = 45, hjust = 1))
+  theme(legend.title = element_blank(), legend.position = "bottom", axis.text.x = element_text(angle = 0, hjust = 1),
+        panel.grid = element_blank()) +
+  guides(fill = guide_legend(nrow = 3, ncol = 2))
 
 # Print the plot
 print(env_wave_vote_threshold)
 
-ggsave(here::here("plot","env_wave_vote_threshold.png"), plot = env_wave_vote_threshold, width = 10, height = 8, dpi = 300, bg = "transparent")
+ggsave(here::here("plot","env_wave_vote_threshold.png"), plot = env_wave_vote_threshold, width = 10, height = 10, dpi = 1000, bg = "transparent")
 ```
 
 ```{r}
@@ -867,36 +904,68 @@ print(total_vote_changes_summary)
 
 print(vote_changes_summary)
 ```
-
 ```{r}
-# First, standardize the column names
-vote_changes_summary <- vote_changes_summary %>%
-  rename(change_status = change_status) %>%
-  mutate(Category = "Specific Changes")
+# Assuming votes_comparison is already loaded and contains participantID, vote_t1, vote_t2
+# First, ensure that vote_t1 and vote_t2 are factors
+votes_comparison$vote_t1 <- as.factor(votes_comparison$vote_t1)
+votes_comparison$vote_t2 <- as.factor(votes_comparison$vote_t2)
 
-total_vote_changes_summary <- total_vote_changes_summary %>%
-  rename(change_status = changed) %>%
-  mutate(Category = "Overall Change")
+# Prepare the data specifically for an alluvial plot
+# We need to create a dataset that explicitly lists each transition between t1 and t2 votes
+alluvial_data <- votes_comparison %>%
+  count(vote_t1, vote_t2) %>%
+  mutate(vote_t1 = as.character(vote_t1), 
+         vote_t2 = as.character(vote_t2))
 
-# Combine the data frames with standardized column names
-combined_summary <- bind_rows(vote_changes_summary, total_vote_changes_summary)
-
-
-vote_changes_dis <- ggplot(combined_summary, aes(x = reorder(change_status, -percentage), y = percentage, fill = Category)) +
-  geom_bar(stat = "identity", position = position_dodge(width = 0.7)) +
-  scale_fill_manual(values = c("Specific Changes" = "#56B4E9", "Overall Change" = "#E69F00")) +
-  geom_text(aes(label = sprintf("%.1f%%", percentage), 
-                y = percentage + 1), # Adjust y for label position above bars
-            position = position_dodge(width = 0.7), 
-            vjust = 0, # Vertical adjustment to place text above bars
-            color = "black", size = 3.5) + # Text color and size
-  labs(x = "Vote Change", y = "Percentage (%)", title = "Distribution of Vote Changes") +
+# Plotting
+ggplot(alluvial_data,
+       aes(axis1 = vote_t1, axis2 = vote_t2, y = n, label = n)) +
+  geom_alluvium(aes(fill = vote_t1)) +
+  geom_text(stat = "stratum", size = 3) +
+  scale_x_discrete(limits = c("t1", "t2"), expand = c(0.1, 0.1)) +
+  scale_fill_manual(values = c("0" = "steelblue", "1" = "seagreen")) +
   theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1),
-        legend.title = element_blank(),
-        legend.position = "bottom")
+  labs(title = "Voting Intention Changes from t1 to t2",
+       x = "", y = "Count of Participants")
+```
+```{r}
+# Assuming votes_comparison is already prepared with participantID, vote_t1, and vote_t2
+# First, ensure that vote_t1 and vote_t2 are factors
+votes_comparison <- votes_comparison %>%
+  mutate(across(c(vote_t1, vote_t2), as.factor))
 
-ggsave(here::here("plot","H1_0.6","vote_changes_dis.png"),vote_changes_dis, width = 10, height = 8, dpi = 300,bg="transparent")
+# Create a summary of vote changes with percentages
+vote_changes_summary <- votes_comparison %>%
+  mutate(
+    change = case_when(
+      vote_t1 == "0" & vote_t2 == "0" ~ "Consistent No",
+      vote_t1 == "1" & vote_t2 == "1" ~ "Consistent Yes",
+      vote_t1 == "0" & vote_t2 == "1" ~ "No to Yes",
+      vote_t1 == "1" & vote_t2 == "0" ~ "Yes to No"
+    )
+  ) %>%
+  count(change) %>%
+  mutate(percentage = n / sum(n) * 100)
+
+# Reorder the factor levels of change by the percentage in descending order for the legend
+vote_changes_summary$change <- fct_reorder(vote_changes_summary$change, vote_changes_summary$percentage, .desc = TRUE)
+
+# Create the pie chart with percentages
+prop_voting_intention <- ggplot(vote_changes_summary, aes(x = "", y = percentage, fill = change)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar("y", start = 0) +
+  theme_void() +
+  scale_fill_brewer(palette = "Set3", direction = -1) + # colorblind-friendly palette
+  geom_text(aes(label = paste0(round(percentage, 1), "%")), position = position_stack(vjust = 0.5),
+            size = 3) +
+  labs(title = "Proportion of Changes in Voting Intention From T1 to T2",
+       fill = "Voting Intention") +
+  theme(legend.position = "right")  # Adjust legend position
+
+# Display the plot
+prop_voting_intention
+
+ggsave(here::here("plot","H1_0.6","prop_voting_intention.png"),prop_voting_intention, width = 8, height = 8, dpi = 300,bg="transparent")
 ```
 
 
@@ -1334,6 +1403,41 @@ print(list(
 ```
 
 ```{r}
+# Function adjusted to extract n directly from the test inputs
+create_signed_rank_test_row <- function(test_result, variable_name, group_name) {
+  n <- length(test_result$data) / 2 # Since data is a concatenated list of both groups
+  v_statistic <- test_result$statistic
+  p_value <- test_result$p.value
+  
+  # Return a tibble row
+  tibble(
+    Variable = variable_name,
+    Group = group_name,
+    N = n,
+    V = v_statistic,
+    P_Value = p_value
+  )
+}
+
+# Assuming data_vote_0 and data_vote_1 are predefined data frames for IntendedVote=0 and IntendedVote=1
+# Applying the function to each test result
+rows <- list(
+  create_signed_rank_test_row(econ_test_overall, "Econ", "Overall"),
+  create_signed_rank_test_row(env_test_overall, "Env", "Overall"),
+  create_signed_rank_test_row(env_test_0, "Env", "IntendedVote=0"),
+  create_signed_rank_test_row(econ_test_0, "Econ", "IntendedVote=0"),
+  create_signed_rank_test_row(env_test_1, "Env", "IntendedVote=1"),
+  create_signed_rank_test_row(econ_test_1, "Econ", "IntendedVote=1")
+)
+
+# Combining all rows into one table
+results_table <- bind_rows(rows)
+
+# Printing the results table
+print(results_table)
+```
+
+```{r}
 #Plotting difference histograms to check symmetry assumption of signed-rank tests
 # Assuming that 'proportions_both_vote_wave_cons' is your dataframe
 # and that 'env' and 'econ' are the names of the variables of interest.
@@ -1424,9 +1528,9 @@ ggsave(here::here("plot","H1_0.6","paired_wilcox_yes_econ.png"), paired_wilcox_y
 ```{r}
 #Differences between-subject (vote) across time and for t1 & t2
 #econ
-wilcox.test(proportions_both_vote_wave$econ[proportions_both_vote_wave$intendedVote==0],proportions_both_vote_wave$econ[proportions_both_vote_wave$intendedVote==1],alternative="greater")
+wilcox.test(proportions_both_vote_wave$econ[proportions_both_vote_wave$intendedVote==0],proportions_both_vote_wave$econ[proportions_both_vote_wave$intendedVote==1],alternative="greater", conf.int = T)
 #env
-wilcox.test(proportions_both_vote_wave$env[proportions_both_vote_wave$intendedVote==1],proportions_both_vote_wave$env[proportions_both_vote_wave$intendedVote==0],alternative="greater")
+wilcox.test(proportions_both_vote_wave$env[proportions_both_vote_wave$intendedVote==1],proportions_both_vote_wave$env[proportions_both_vote_wave$intendedVote==0],alternative="greater", conf.int = T)
 
 #Filter waves
 data_t1_all <- filter(proportions_both_vote_wave, wave == "t1")
@@ -1434,17 +1538,17 @@ data_t2_all <- filter(proportions_both_vote_wave, wave == "t2")
 
 # Wilcoxon Rank Sum Test for t1
 #econ t1
-wilcox.test(data_t1_all$econ[data_t1_all$intendedVote==0],data_t1_all$econ[data_t1_all$intendedVote==1],alternative="greater")
+wilcox.test(data_t1_all$econ[data_t1_all$intendedVote==0],data_t1_all$econ[data_t1_all$intendedVote==1],alternative="greater", conf.int = T)
 
 #env t1
-wilcox.test(data_t1_all$env[data_t1_all$intendedVote==1],data_t1_all$env[data_t1_all$intendedVote==0],alternative="greater")
+wilcox.test(data_t1_all$env[data_t1_all$intendedVote==1],data_t1_all$env[data_t1_all$intendedVote==0],alternative="greater", conf.int = T)
 
 # Wilcoxon Rank Sum Test for t2
 #econ t2
-wilcox.test(data_t2_all$econ[data_t2_all$intendedVote==0],data_t2_all$econ[data_t2_all$intendedVote==1],alternative="greater")
+wilcox.test(data_t2_all$econ[data_t2_all$intendedVote==0],data_t2_all$econ[data_t2_all$intendedVote==1],alternative="greater", conf.int = T)
 
 #env t2
-wilcox.test(data_t2_all$env[data_t2_all$intendedVote==1],data_t2_all$env[data_t2_all$intendedVote==0],alternative="greater")
+wilcox.test(data_t2_all$env[data_t2_all$intendedVote==1],data_t2_all$env[data_t2_all$intendedVote==0],alternative="greater", conf.int = T)
 
 #No significant differences between voters in t1
 #significant differences in env between voters in t2
@@ -1456,6 +1560,58 @@ wilcox_effsize(data_t1_all, env~intendedVote, ref.group = "1",detailed=T,alterna
 
 wilcox_effsize(data_t2_all, env~intendedVote, ref.group = "1",detailed=T,alternative="greater")
 ```
+```{r}
+# Adjusted function to include n1 and n2
+calculate_rank_sums <- function(group1, group2, variable_name) {
+  test_result <- wilcox.test(group1, group2, alternative="greater", conf.int = TRUE)
+  w_statistic <- test_result$statistic
+  n1 <- length(group1)
+  n2 <- length(group2)
+  total_rank_sum <- (n1 + n2) * (n1 + n2 + 1) / 2
+  rank_sum_group1 <- w_statistic
+  rank_sum_group2 <- total_rank_sum - w_statistic
+  # Return a dataframe row
+  tibble(
+    Variable = variable_name,
+    n1 = n1,
+    n2 = n2,
+    Rank_Sum_Group_1 = rank_sum_group1,
+    Rank_Sum_Group_2 = rank_sum_group2,
+    P_Value = test_result$p.value
+  )
+}
+
+# List of test cases
+test_cases <- list(
+  econ_all = list(group1 = proportions_both_vote_wave$econ[proportions_both_vote_wave$intendedVote==0],
+                  group2 = proportions_both_vote_wave$econ[proportions_both_vote_wave$intendedVote==1],
+                  name = "Econ All"),
+  env_all = list(group1 = proportions_both_vote_wave$env[proportions_both_vote_wave$intendedVote==1],
+                 group2 = proportions_both_vote_wave$env[proportions_both_vote_wave$intendedVote==0],
+                 name = "Env All"),
+  econ_t1 = list(group1 = data_t1_all$econ[data_t1_all$intendedVote==0],
+                 group2 = data_t1_all$econ[data_t1_all$intendedVote==1],
+                 name = "Econ T1"),
+  env_t1 = list(group1 = data_t1_all$env[data_t1_all$intendedVote==1],
+                group2 = data_t1_all$env[data_t1_all$intendedVote==0],
+                name = "Env T1"),
+  econ_t2 = list(group1 = data_t2_all$econ[data_t2_all$intendedVote==0],
+                 group2 = data_t2_all$econ[data_t2_all$intendedVote==1],
+                 name = "Econ T2"),
+  env_t2 = list(group1 = data_t2_all$env[data_t2_all$intendedVote==1],
+                group2 = data_t2_all$env[data_t2_all$intendedVote==0],
+                name = "Env T2")
+)
+
+# Applying the function to each test case and combining results
+results_table <- bind_rows(lapply(test_cases, function(case) {
+  calculate_rank_sums(case$group1, case$group2, case$name)
+}))
+
+# Printing the results table
+print(results_table)
+```
+
 
 ```{r}
 # Calculate median values for 'env' across all time points, T1, and T2
@@ -1602,13 +1758,25 @@ model_all_glm <- glm(fintendedVote ~ econ + env,
                      family = binomial, data = energyact_fin_summary)
 
 # Displaying the summary of the model
-summary(model_all_glm)
+summary_model <- summary(model_all_glm)
 
+# Calculate the 95% confidence intervals for the estimates
+ci <- confint.default(model_all_glm)
+
+# Add the confidence intervals to the summary table
+summary_model$coefficients <- cbind(summary_model$coefficients, "Lower 95% CI" = ci[, 1], "Upper 95% CI" = ci[, 2])
+
+# Display the summary with confidence intervals
+print(summary_model)
+
+# Calculate and print the odds ratio for 'env'
 odds_ratio_env <- exp(coef(model_all_glm)["env"])
-odds_ratio_env
 print(paste("Odds ratio of Env =", odds_ratio_env))
+
+# Calculate the odds ratio per word change (1/8)
 per_word_or <- odds_ratio_env^0.125
 print(paste("Odds ratio of Env per word change (1/8) =", per_word_or))
+
 ```
 ```{r}
 # Adding squared terms for continuous predictors
@@ -1666,7 +1834,7 @@ auc_value <- auc(roc_curve)
 print(paste("Area under the ROC curve (AUC):", auc_value))
 
 # Plot the ROC curve
-plot(roc_curve, main="ROC Curve")
+auc_plot_0.6 <- plot(roc_curve, main="ROC Curve")
 abline(a=0, b= 1, col="red")
 ```
 

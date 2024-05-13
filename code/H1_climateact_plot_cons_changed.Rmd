@@ -250,48 +250,71 @@ data3_env$Threshold <- "0.7"
 # Merge the datasets into one
   combined_data_econ <- bind_rows(data1_econ, data2_econ, data3_econ)
 
-# Create the plot with a corrected legend title
+# Create the plot with the corrected error bar calculation and geom_text positioning
 combined_plot_econ <- ggplot(combined_data_econ, aes(x = BarName, y = Mean, fill = gsub(" t[12]", "", BarName))) +
   geom_bar(stat = "identity", position = position_dodge(width = 0.8), color = "black") +
-  geom_errorbar(aes(ymin = Mean - SD, ymax = Mean + SD), width = 0.2, position = position_dodge(width = 0.8)) +
-  geom_text(aes(label = paste0(Mean, " (", SD, ")"), y = Mean + SD + 0.03), 
-            vjust = 0, position = position_dodge(width = 0.8), size = 3, angle = 45) +
-  scale_fill_brewer(palette = "Set3", name = "Vote Change") +  # Set the legend title here
+  geom_errorbar(
+    aes(ymin = pmax(Mean - SD, 0), ymax = pmin(Mean + SD, 1)), # Corrected error bars calculation
+    width = 0.2, 
+    position = position_dodge(width = 0.8)
+  ) +
+  geom_text(
+    aes(label = paste0(Mean, " (", SD, ")"), y = Mean + SD + 0.03), 
+    vjust = 0, 
+    position = position_dodge(width = 1), 
+    size = 4.5, 
+    angle = 45
+  ) +
+  scale_fill_brewer(palette = "Set3", name = "Vote Change") +
   facet_wrap(~Threshold, scales = "free_x", ncol = 3) +
-  labs(title = "Mean and SD of Economy Proportion by Vote and Wave for Subset of Voters by Threshold",
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.2)) +
+  labs(title = "Mean and Standard Deviation of Economy Proportion by Vote and Wave for Subset of Voters by Threshold",
        x = "", y = "Mean Proportion") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1), 
         legend.position = "bottom",
-        strip.text.x = element_text(size = 10))
+        strip.text.x = element_text(size = 10),
+        panel.grid.minor = element_blank(),
+        panel.grid.major = element_blank())
 
 # Print the combined plot
 print(combined_plot_econ)
 
-ggsave(here::here("plot","econ_subset_3.png"), plot = combined_plot_econ, width = 16, height = 10, dpi = 300, bg = "transparent")
+ggsave(here::here("plot","econ_subset_3.png"), plot = combined_plot_econ, width = 20, height = 10, dpi = 1000, bg = "transparent")
 ```
 
 ```{r}
 # Merge the datasets into one
 combined_data_env <- bind_rows(data1_env, data2_env, data3_env)
 
-# Create the plot
+# Create the plot with the corrected error bar calculation and geom_text positioning
 combined_plot_env <- ggplot(combined_data_env, aes(x = BarName, y = Mean, fill = gsub(" t[12]", "", BarName))) +
   geom_bar(stat = "identity", position = position_dodge(width = 0.8), color = "black") +
-  geom_errorbar(aes(ymin = Mean - SD, ymax = Mean + SD), width = 0.2, position = position_dodge(width = 0.8)) +
-  geom_text(aes(label = paste0(Mean, " (", SD, ")"), y = Mean + SD + 0.03), 
-            vjust = 0, position = position_dodge(width = 0.8), size = 3, angle = 45) +
-  scale_fill_brewer(palette = "Set3", name = "Vote Change") +  # Set the legend title here
+  geom_errorbar(
+    aes(ymin = pmax(Mean - SD, 0), ymax = pmin(Mean + SD, 1)), # Corrected error bars calculation
+    width = 0.2, 
+    position = position_dodge(width = 0.8)
+  ) +
+  geom_text(
+    aes(label = paste0(Mean, " (", SD, ")"), y = Mean + SD + 0.03), 
+    vjust = 0, 
+    position = position_dodge(width = 1), 
+    size = 4.5, 
+    angle = 45
+  ) +
+  scale_fill_brewer(palette = "Set3", name = "Vote Change") +
   facet_wrap(~Threshold, scales = "free_x", ncol = 3) +
-  labs(title = "Mean and SD of Environmental Protection Proportion by Vote and Wave for Subset of Voters by Threshold",
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.2)) +
+  labs(title = "Mean and Standard Deviation of Environmental Protection Proportion by Vote and Wave for Subset of Voters by Threshold",
        x = "", y = "Mean Proportion") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1), 
         legend.position = "bottom",
-        strip.text.x = element_text(size = 10))
+        strip.text.x = element_text(size = 10),
+        panel.grid = element_blank())
 
 # Print the combined plot
 print(combined_plot_env)
 
-ggsave(here::here("plot","env_subset_3.png"), plot = combined_plot_env, width = 16, height = 10, dpi = 300, bg = "transparent")
+ggsave(here::here("plot","env_subset_3.png"), plot = combined_plot_env, width = 20, height = 10, dpi = 1000, bg = "transparent")
 ```
